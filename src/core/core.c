@@ -175,12 +175,8 @@ void recursion_callback(const char * src, callback_args params) {
   errno = 0;
   while (fgets(buffer, LINE_BUFFER_SIZE, stream) != NULL) {
     if (is_line_empty(buffer)) continue;
-    if (buffer[0] == '/' && buffer[1] == '/') {
-      status.line_count++;
-      continue;
-    }
 
-    if (status.is_header) { // We can try to read variables
+    if (status.is_header && !status.reading_function_params) { // We can try to read variables
       if (try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
     }
 
