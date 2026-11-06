@@ -62,9 +62,11 @@ int main(int argc, char * argv[]) {
   recursion(config.src, &callback_args, remove_comments_callback);
   if (callback_args.results.fails > 0) {
     fprintf(stderr, "Failed to remove comments flawlessly.\n");
+    cleanup(&config);
     return 1;
   }
   recursion(config.work, &callback_args, recursion_callback);
 
+  cleanup(&config);
   free_source_code(callback_args.source_code);
 }

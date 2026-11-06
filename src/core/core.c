@@ -301,3 +301,7 @@ int mkdirp(const char * path) {
   if (mkdir(word, 0777) == -1 && errno != EEXIST) return errno;
   return 0;
 }
+
+void cleanup(gen_config_t config) {
+  rmdir(config->work);
+}
