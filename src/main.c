@@ -51,13 +51,18 @@ int main(int argc, char * argv[]) {
     return 1;
   }
 
-  struct source_code source_code = {};
-  recursion(config.src, &(struct callback_args_s){
-      .config = &config,
-      .source_code = &source_code,
-      .results = (struct result){
-        .success = 0,
-        .fails = 0
-      }
-  }, recursion_callback);
+  struct callback_args_s callback_args = {
+    .config = &config,
+    .source_code = &(struct source_code){},
+    .results = (struct result){
+      .success = 0,
+      .fails = 0
+    }
+  };
+  recursion(config.src, &callback_args, remove_comments_callback);
+  if (callback_args.results.fails > 0) {
+    fprintf(stderr, "Failed to remove comments flawlessly.\n");
+    return 1;
+  }
+  recursion(config.work, &callback_args, recursion_callback);
 }

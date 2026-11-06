@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +44,119 @@ static int is_line_empty(const char * line) {
   return *line == 0 || *line == '\n';
 }
 
+static void calculate_work_filename(const char * src, const callback_args params, char * buffer) {
+  unsigned i = 0;
+  unsigned bufindex = 0;
+  while (src[i] == params->config->src[i] && i < PATH_MAX) i++;
+
+  while (params->config->work[bufindex] != 0 && bufindex < PATH_MAX) {
+    buffer[bufindex] = params->config->work[bufindex];
+    bufindex++;
+  }
+
+  while (src[i] != 0 && i < PATH_MAX) {
+    buffer[bufindex] = src[i];
+    bufindex++;
+    i++;
+  }
+  buffer[bufindex] = 0;
+}
+void remove_comments_callback(const char * src, callback_args params) {
+  int fd;
+  int outfd;
+  char outbuf[PATH_MAX];
+  calculate_work_filename(src, params, outbuf);
+  if (mkdirp(outbuf) != 0) {
+    perror("mkdirp for comments");
+    params->results.fails++;
+    return;
+  }
+
+  if ((fd = open(src, O_RDONLY)) == -1) {
+    perror("open");
+    params->results.fails++;
+    return;
+  }
+  if ((outfd = open(outbuf, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+    perror("open output file for comments");
+    params->results.fails++;
+    close(fd);
+    return;
+  }
+
+  int in_multine_comment = 0;
+  int ignore_rest_of_line = 0;
+
+  char buffer[BUFSIZ];
+  char writebuffer[BUFSIZ];
+
+  unsigned int index = 0;
+  unsigned int write_count = 0;
+  ssize_t rbytes;
+  while ((rbytes = read(fd, buffer, BUFSIZ)) > 0) {
+    index = 0;
+    write_count = 0;
+
+    while (index < rbytes) {
+      if (ignore_rest_of_line == 1) {
+        if (buffer[index] == '\n') {
+          ignore_rest_of_line = 0;
+          writebuffer[write_count] = '\n';
+          write_count++;
+          index++;
+          continue;
+        } else {
+          index++;
+          continue;
+        }
+      }
+      if (in_multine_comment) {
+        if (buffer[index] == '*' && buffer[index + 1] == '/') {
+          in_multine_comment = 0;
+          index+=2;
+          continue;
+        } else {
+          index++;
+          continue;
+        }
+      }
+
+      if (buffer[index] == '/') {
+        if (buffer[index + 1] == '/') {
+          ignore_rest_of_line = 1;
+          index += 2;
+          continue;
+        }
+        if (buffer[index + 1] == '*') {
+          in_multine_comment = 1;
+          index += 2;
+          continue;
+        }
+      }
+
+      writebuffer[write_count] = buffer[index];
+      write_count++;
+      index++;
+    }
+
+    if (write_count > 0) {
+      if (write(outfd, writebuffer, write_count) == -1) {
+        perror("write for comments");
+        params->results.fails++;
+        goto close;
+      }
+    }
+  }
+  if (rbytes == -1) {
+    perror("read for comments");
+    params->results.fails++;
+    goto close;
+  }
+
+close:
+  close(fd);
+  close(outfd);
+}
 void recursion_callback(const char * src, callback_args params) {
   FILE * stream;
   if ((stream = fopen(src, "rb")) == NULL) {
@@ -150,7 +264,6 @@ int create_config(const char * src, const char * dst, const char * work, gen_con
   return 0;
 }
 int mkdirp(const char * path) {
-  printf("Called with path = %s\n", path);
   char buffer_[PATH_MAX];
   char * buffer = buffer_;
 
