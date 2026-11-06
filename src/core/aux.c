@@ -63,7 +63,6 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
   if (*buffer == '#') return 1;
 
   char * ptr = (char *)buffer;
-  int has_equal;
   char * word_before_equal = buffer;
   char * type = buffer;
   char * equals = NULL;
@@ -108,33 +107,35 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
 
   printf("Variable type is : %s and variable name is %s\n", typebuf, word_before_equal);
 
-  if (params->source_code->variables.count == 0) {
-    if ((params->source_code->variables.array = malloc(sizeof(struct variable))) == NULL) {
-      perror("malloc");
+  if (status->is_header) {
+    if (params->source_code->definitions.variables.count == 0) {
+      if ((params->source_code->definitions.variables.array = malloc(sizeof(struct variable))) == NULL) {
+        perror("malloc");
+        params->results.fails++;
+        return 1;
+      }
+    } else if ((params->source_code->definitions.variables.array = realloc(params->source_code->definitions.variables.array, sizeof(struct variable) * (params->source_code->definitions.variables.count + 1))) == NULL) {
+      perror("realloc");
       params->results.fails++;
       return 1;
     }
-  } else if ((params->source_code->variables.array = realloc(params->source_code->variables.array, sizeof(struct variable) * (params->source_code->variables.count + 1))) == NULL) {
-    perror("realloc");
-    params->results.fails++;
-    return 1;
-  }
 
-  params->source_code->variables.array[params->source_code->variables.count] = (struct variable){
-    .ref = &(struct reference){
-      .line = status->line_count + 1
-    },
-    .type = &(entity_type_t){
-      .ptr = NULL,
-      .type = NoneType,
-    }
-  };
-  struct variable var = params->source_code->variables.array[params->source_code->variables.count];
+    params->source_code->definitions.variables.array[params->source_code->definitions.variables.count] = (struct variable){
+      .ref = &(struct reference){
+        .line = status->line_count + 1
+      },
+      .type = &(entity_type_t){
+        .ptr = NULL,
+        .type = NoneType,
+      }
+    };
+  }
+  struct variable var = params->source_code->definitions.variables.array[params->source_code->definitions.variables.count];
   STRCP((char *)path, var.ref->filename, PATH_MAX, 1);
   STRCP(word_before_equal, var.name, ENTITIES_NAME_LENGTH, 1);
   STRCP(typebuf, var.type->string, ENTITIES_NAME_LENGTH, 1);
 
-  params->source_code->variables.count++;
+  params->source_code->definitions.variables.count++;
 
   return 0;
 }
