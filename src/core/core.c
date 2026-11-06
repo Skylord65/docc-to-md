@@ -195,7 +195,7 @@ last_bit:
   }
 
   fclose(stream);
-};
+}
 recursion_return_t recursion(const char * input, callback_args params, recursion_callback_t callback) {
   DIR * dir;
   if ((dir = opendir(input)) == NULL) {

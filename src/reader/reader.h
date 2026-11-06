@@ -4,6 +4,7 @@
 #include <linux/limits.h>
 
 #define ENTITIES_NAME_LENGTH 64
+#define MACRO_PLACEHOLDER_LENGTH 2048
 
 typedef unsigned long int ulint;
 
@@ -62,7 +63,10 @@ struct function_spec {
 
   struct function_args * args;
 };
-struct macro_spec {};
+struct macro_spec {
+  char name[ENTITIES_NAME_LENGTH];
+  char placeholder[MACRO_PLACEHOLDER_LENGTH];
+};
 struct variable {
   reference_t ref;
   entity_type_t * type;
