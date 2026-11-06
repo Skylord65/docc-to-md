@@ -46,6 +46,7 @@ struct status_s {
 
   unsigned long long int line_count;
 };
+extern int normalize_type_string(const char * type, char * typebuf);
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
 
 #endif

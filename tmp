@@ -1,0 +1,7 @@
+gcc build/main.o build/core/aux.o build/core/core.o build/parsers/args.o build/parsers/parsers.o build/parsers/stringlib.o build/reader/reader.o build/parsers/presenting/presenting.o -Wall -Wextra -Wundef -Wpedantic -g  -fsanitize=address,undefined   -o bin/main.uwu
+/usr/bin/ld : build/parsers/stringlib.o : dans la fonction « streq » :
+/home/David/github/docc-to-md/src/parsers/stringlib.c:4 : définitions multiples de « streq »; build/core/aux.o:/home/David/github/docc-to-md/src/core/../parsers/stringlib.c:4 : défini pour la première fois ici
+/usr/bin/ld : build/parsers/stringlib.o : dans la fonction « join » :
+/home/David/github/docc-to-md/src/parsers/stringlib.c:14 : définitions multiples de « join »; build/core/aux.o:/home/David/github/docc-to-md/src/core/../parsers/stringlib.c:14 : défini pour la première fois ici
+collect2: error: ld a retourné le statut de sortie 1
+make: *** [makefile:31: bin/main.uwu] Error 1

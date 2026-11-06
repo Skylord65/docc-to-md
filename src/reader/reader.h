@@ -13,8 +13,23 @@ struct reference {
 };
 typedef struct reference * reference_t;
 
-typedef struct {} entity_type_t;
+// Type type
+typedef enum {
+  NoneType = 0,
+  StructureType = 1,
+  FunctionType = 2,
+  TypedefType = 3,
+  MacroType = 4,
+  PrimitiveType = 5
+} TypeTypeIndicator;
 
+typedef struct {
+  TypeTypeIndicator type;
+  char string[ENTITIES_NAME_LENGTH];
+  void * ptr;
+} entity_type_t;
+
+// Members types
 struct struct_member {
   char name[ENTITIES_NAME_LENGTH];
   entity_type_t * type;
@@ -28,7 +43,11 @@ struct struct_spec {
   char name[ENTITIES_NAME_LENGTH];
   struct struct_members * members;
 };
-struct typedef_spec {};
+struct typedef_spec {
+  reference_t ref;
+  char name[ENTITIES_NAME_LENGTH];
+  entity_type_t * definition;
+};
 struct function_arg {
   char name[ENTITIES_NAME_LENGTH];
   entity_type_t * type;

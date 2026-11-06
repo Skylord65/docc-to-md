@@ -234,6 +234,7 @@ recursion_return_t recursion(const char * input, callback_args params, recursion
   }
   if (errno != 0) {
     perror("readdir");
+    closedir(dir);
     return ReadError;
   }
 

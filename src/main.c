@@ -65,4 +65,6 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   recursion(config.work, &callback_args, recursion_callback);
+
+  free_source_code(callback_args.source_code);
 }
