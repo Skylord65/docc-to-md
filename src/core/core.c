@@ -116,6 +116,10 @@ void remove_comments_callback(const char * src, callback_args params) {
           index+=2;
           continue;
         } else {
+          if (buffer[index] == '\n') {
+            writebuffer[write_count] = '\n';
+            write_count++;
+          }
           index++;
           continue;
         }
@@ -176,7 +180,7 @@ void recursion_callback(const char * src, callback_args params) {
   char buffer[LINE_BUFFER_SIZE];
   errno = 0;
   while (fgets(buffer, LINE_BUFFER_SIZE, stream) != NULL) {
-    if (is_line_empty(buffer)) continue;
+    if (is_line_empty(buffer)) goto last_bit;
 
     if (status.reading_multiline_macro) {
       try_extract_macro_multiline(buffer, params, &status);
