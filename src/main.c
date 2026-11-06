@@ -25,6 +25,7 @@ int main(int argc, char * argv[]) {
   struct arg_input args[] = {
     { "--src", "Source directory", String, 0, 0, NULL },
     { "--dest", "Destination directory", String, 0, 0, NULL },
+    { "--work", "Work directory", String, 0, 0, "/tmp/docc-to-md" },
     { "--version", "Displays version and exits", Presence, 0, 0, NULL },
     { "--help", "Displays help and exits", Presence, 0, 0, NULL }
   };
@@ -32,11 +33,11 @@ int main(int argc, char * argv[]) {
 
   find_all(argc, argv, args, args_size);
 
-  if (args[3].found) {
+  if (args[4].found) {
     display_args(args_size, args);
     return 0;
   }
-  if (args[2].found) {
+  if (args[3].found) {
     printf(PROG_VERSION "\n");
     return 0;
   }
@@ -45,7 +46,7 @@ int main(int argc, char * argv[]) {
   if (!args[1].found) ARG_MISSING(args[1]);
 
   struct gen_config config;
-  if (create_config(args[0].str_result, args[1].str_result, &config) != 0) {
+  if (create_config(args[0].str_result, args[1].str_result, args[2].str_result, &config) != 0) {
     fprintf(stderr, "Failed to parse config\n");
     return 1;
   }

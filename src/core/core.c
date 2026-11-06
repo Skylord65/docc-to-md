@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../macros.h"
 
 #include <unistd.h>
 #include <errno.h>
@@ -128,14 +129,61 @@ recursion_return_t recursion(const char * input, callback_args params, recursion
 
 #undef IS_SYS_PATH
 
-int create_config(const char * src, const char * dst, gen_config_t configp) {
+int create_config(const char * src, const char * dst, const char * work, gen_config_t configp) {
   if (realpath(src, configp->src) == NULL) {
     perror("realpath");
     return 1;
   }
-  if (realpath(src, configp->dest) == NULL) {
+  if (realpath(dst, configp->dest) == NULL) {
     perror("realpath");
     return 1;
   }
+  STRCP((char *)work, configp->work, PATH_MAX, 1);
+  if (mkdirp(configp->work) != 0) {
+    perror("mkdirp");
+    return 1;
+  }
+  if (realpath(work, configp->work) == NULL) {
+    perror("realpath");
+    return 1;
+  }
+  return 0;
+}
+int mkdirp(const char * path) {
+  printf("Called with path = %s\n", path);
+  char buffer_[PATH_MAX];
+  char * buffer = buffer_;
+
+  STRCP((char *)path, buffer, PATH_MAX, 1);
+
+  unsigned i = 0;
+  char * word = buffer;
+  char * last_slash = buffer;
+  while (*buffer != 0 && i < PATH_MAX) {
+    if (*buffer == '/' && i > 0) {
+      last_slash = buffer;
+      *buffer = 0;
+
+      if (mkdir(word, 0777) == -1) {
+        if (errno != EEXIST) return errno;
+      }
+
+      *buffer = '/';
+    }
+
+    buffer++;
+    i++;
+  }
+
+  char * dot = NULL;
+  while (*last_slash != 0 && i < PATH_MAX) {
+    if (*last_slash == '.') dot = last_slash;
+    i++;
+    last_slash++;
+  }
+
+  if (dot != NULL && *(dot + 1) != 0) return 0; // This is a file, ending in . something
+  // It is not a file, create from word
+  if (mkdir(word, 0777) == -1 && errno != EEXIST) return errno;
   return 0;
 }

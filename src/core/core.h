@@ -14,6 +14,7 @@ typedef enum {
 struct gen_config {
   char src[PATH_MAX];
   char dest[PATH_MAX];
+  char work[PATH_MAX];
 };
 typedef struct gen_config * gen_config_t;
 struct result {
@@ -32,7 +33,7 @@ typedef void recursion_callback_t(const char * src, callback_args params);
 extern recursion_return_t recursion(const char * src, callback_args params, recursion_callback_t callback);
 extern void recursion_callback(const char * src, callback_args params);
 
-extern int create_config(const char * src, const char * dst, gen_config_t);
+extern int create_config(const char * src, const char * dst, const char * work, gen_config_t);
 
 struct status_s {
   int in_function;
@@ -44,5 +45,6 @@ struct status_s {
   unsigned long long int line_count;
 };
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int mkdirp(const char * path);
 
 #endif
