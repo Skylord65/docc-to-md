@@ -94,12 +94,23 @@ struct typedef_indic {
   struct typedef_spec * array;
 };
 
-struct source_code {
+struct source_code_defs {
   struct function_indic  functions;
   struct macro_indic     macros;
   struct struct_indic    structs;
   struct typedef_indic   typedefs;
   struct variables_indic variables;
+};
+struct source_code_impls {
+  struct function_indic  functions;
+  struct macro_indic     macros;
+  struct struct_indic    structs;
+  struct typedef_indic   typedefs;
+};
+
+struct source_code {
+  struct source_code_impls implementations;
+  struct source_code_defs definitions;
 };
 
 typedef struct source_code * source_code_t;
