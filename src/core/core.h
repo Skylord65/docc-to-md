@@ -44,6 +44,7 @@ struct status_s {
   int is_header;
   int reading_function_params;
   int reading_multiline_macro;
+  int reading_multiline_struct;
 
   unsigned long long int line_count;
   void * data;
@@ -58,10 +59,17 @@ struct macro_multiline_status_s {
   int in_string;
   int in_char;
 };
+struct struct_multiline_status_s {
+  char name[ENTITIES_NAME_LENGTH];
+  ulint members_count;
+  char ** members_array; // Store them as string, keep the computing when we are sure it is complete
+};
 
 extern int normalize_type_string(const char * type, char * typebuf);
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_macro(char * buffer, const char * path, callback_args args, struct status_s *);
-extern int try_extract_macro_multiline(char * buffer, const char * path, callback_args, struct status_s *);
+extern int try_extract_macro_multiline(char * buffer, callback_args, struct status_s *);
+extern int try_extract_struct(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int try_extract_struct_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 
 #endif
