@@ -169,7 +169,8 @@ void recursion_callback(const char * src, callback_args params) {
     .is_header = is_header(src),
     .in_function = 0,
     .reading_function_params = 0,
-    .reading_multiline_macro = 0
+    .reading_multiline_macro = 0,
+    .reading_multiline_struct = 0
   };
 
   char buffer[LINE_BUFFER_SIZE];
@@ -182,11 +183,12 @@ void recursion_callback(const char * src, callback_args params) {
       goto last_bit;
     }
 
-    if (status.is_header && !status.reading_function_params) { // We can try to read variables
-      if (try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
-    }
-    if (!status.reading_function_params) {
+    if (!status.reading_multiline_struct || !status.reading_multiline_macro || !status.reading_function_params) {
+      if (status.is_header) {
+        if (try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
+      }
       if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
+      if (try_extract_struct(buffer, src, params, &status) == 0) goto last_bit;
     }
 
 last_bit:
