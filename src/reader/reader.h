@@ -63,9 +63,15 @@ struct function_spec {
 
   struct function_args * args;
 };
+struct macro_args {
+  ulint count;
+  char ** array;
+};
 struct macro_spec {
   char name[ENTITIES_NAME_LENGTH];
   char placeholder[MACRO_PLACEHOLDER_LENGTH];
+  int is_function;
+  struct macro_args * args;
 };
 struct variable {
   reference_t ref;

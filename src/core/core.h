@@ -4,6 +4,7 @@
 #include "../reader/reader.h"
 
 #include <linux/limits.h>
+#include <unistd.h>
 
 typedef enum {
   Ok = 0,
@@ -42,12 +43,25 @@ struct status_s {
   int in_function;
   int is_header;
   int reading_function_params;
-
-  int in_multine_comment;
+  int reading_multiline_macro;
 
   unsigned long long int line_count;
+  void * data;
 };
+struct macro_multiline_status_s {
+  char ** array;
+  ulint params_count;
+  int is_function;
+  ulint content_index;
+  char content[MACRO_PLACEHOLDER_LENGTH];
+  char name[ENTITIES_NAME_LENGTH];
+  int in_string;
+  int in_char;
+};
+
 extern int normalize_type_string(const char * type, char * typebuf);
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int try_extract_macro(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int try_extract_macro_multiline(char * buffer, const char * path, callback_args, struct status_s *);
 
 #endif
