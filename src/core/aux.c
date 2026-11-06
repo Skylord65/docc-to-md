@@ -203,10 +203,12 @@ static int register_macro(callback_args params, struct status_s * status) {
   STRCP(data->content, macro->placeholder, data->content_index, 1);
 
   free(status->data);
+  status->data = NULL;
   return 0;
 
 return_fail:
   free(status->data);
+  status->data = NULL;
   return 1;
 }
 int try_extract_macro(char * buffer, const char * path, callback_args params, struct status_s * status) {
