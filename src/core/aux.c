@@ -63,6 +63,26 @@ int normalize_type_string(const char * type, char * typebuf) {
 
   return 0;
 }
+/*
+ * This function replaces in `path` the source `replace` by the new path `by`.
+ * It writes in buffer as the function goes by
+ */
+static void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max) {
+  unsigned i = 0;
+  unsigned bufindex = 0;
+  while (path[i] == replace[i] && i < max) i++;
+
+  while (by[bufindex] != 0 && bufindex < max) {
+    buffer[bufindex] = by[bufindex];
+    bufindex++;
+  }
+  while (path[i] != 0 && i < max && bufindex < max) {
+    buffer[bufindex] = path[i];
+    bufindex++;
+    i++;
+  }
+  buffer[bufindex] = 0;
+}
 int try_extract_variable(char * buffer, const char * path, callback_args params, struct status_s * status) {
   if (*buffer == '#') return 1;
 
@@ -143,7 +163,7 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
       return 0;
     }
     var->ref->line = status->line_count;
-    STRCP((char *)path, var->ref->filename, PATH_MAX, 1);
+    rebase_path(path, params->config->work, params->config->src, var->ref->filename, PATH_MAX);
     STRCP(word_before_equal, var->name, ENTITIES_NAME_LENGTH, 1);
     STRCP(typebuf, var->type->string, ENTITIES_NAME_LENGTH, 1);
 
@@ -217,7 +237,7 @@ static int register_macro(callback_args params, struct status_s * status) {
   STRCP(data->name, macro->name, ENTITIES_NAME_LENGTH, 1);
   STRCP(data->content, macro->placeholder, data->content_index, 1);
   macro->ref->line = data->starts_on_line;
-  STRCP((char *)data->filenameptr, macro->ref->filename, PATH_MAX - 1, 1);
+  rebase_path(data->filenameptr, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
 
   free(status->data);
   status->data = NULL;
