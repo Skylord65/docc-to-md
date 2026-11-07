@@ -404,7 +404,7 @@ escape_back:
   return 0;
 }
 
-int try_extract_macro_multiline(char * buffer, const char * path, callback_args params, struct status_s * status) {
+int try_extract_macro_multiline(char * buffer, callback_args params, struct status_s * status) {
   // This is pretty  straightforward : Just copy until we reach either end of line, or line break (\) followed by some spaces/end of lines
   struct macro_multiline_status_s * data = status->data;
   const char * origin = buffer;
