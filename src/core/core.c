@@ -188,11 +188,11 @@ void recursion_callback(const char * src, callback_args params) {
     }
 
     if (!status.reading_multiline_struct || !status.reading_multiline_macro || !status.reading_function_params) {
+      if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
+      if (try_extract_struct(buffer, src, params, &status) == 0) goto last_bit;
       if (status.is_header) {
         if (try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
       }
-      if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
-      if (try_extract_struct(buffer, src, params, &status) == 0) goto last_bit;
     }
 
 last_bit:
