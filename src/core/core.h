@@ -63,6 +63,9 @@ struct macro_multiline_status_s {
 };
 struct struct_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
+  ulint starts_on_line;
+  int reading_members;
+  int reading_member;
   ulint members_count;
   char ** members_array; // Store them as string, keep the computing when we are sure it is complete
 };
