@@ -426,20 +426,101 @@ int try_extract_macro_multiline(char * buffer, callback_args params, struct stat
   return 0;
 }
 
-static void compute_struct_member(char * value, char ** type, char ** name) {
+static void swap_words_inplace(char * value, char * a, char * b, size_t max) {
+  if (a > b) {
+    char * c = a;
+    a = b;
+    b = c;
+  }
+
+  char * tmp;
+  if ((tmp = malloc(max)) == NULL) {
+    perror("malloc swap_words_inplace");
+    return;
+  }
+
+  size_t index_tmp = 0;
+  while (value != a) value++; // Go to first word
+  while (value[index_tmp] != ' ') {
+    tmp[index_tmp] = value[index_tmp];
+    index_tmp++;
+  }
+
+  size_t second_word_index = 0;
+  while (b[second_word_index] != 0 && b[second_word_index] != ' ') {
+    value[second_word_index] = b[second_word_index];
+    second_word_index++;
+  }
+  value[second_word_index++] = ' ';
+
+  size_t rewrite_index = 0;
+  while (rewrite_index < index_tmp) {
+    value[second_word_index + rewrite_index] = tmp[rewrite_index];
+    rewrite_index++;
+  }
+
+  free(tmp);
+}
+/*
+ * Move everything from `from` to `at`
+ * `at` needs to be prior to from, otherwise you wouldn't be calling this function
+ */
+static char * savagely_move_string_inplace(char * from, char * at) {
+  while (*from != 0) {
+    *at = *from;
+    at++;
+    from++;
+  }
+  return at;
+}
+
+static void compute_struct_member(char * value, char ** type, char ** name, int * free_type) {
+  char * ptr = value;
   char * last_space = NULL;
   char * first_space = NULL;
   *type = value;
   *name = NULL;
+  *free_type = 0;
 
   while (*value != 0) {
     if (*value == ' ') {
       first_space = value;
       while (*value == ' ') value++;
-      *name = value;
-      last_space = value - 1;
+      if (*value == '[') { // This is a something_somethinng name [] case, with the bracket separated. In that case, just swap them and end up like something_something [] name
+        swap_words_inplace(ptr, *name, value, ENTITIES_NAME_LENGTH);
+        // Now find the new name and track it, we will glide to the end and then make our way back from there
+        while (*value != 0) value++;
+        while (*value != ' ') value--;
+        *name = value + 1;
+        last_space = value;
+
+        while (*value == ' ') value --;
+        first_space = value + 1;
+      } else {
+        *name = value;
+        last_space = value - 1;
+      }
     }
     value++;
+  }
+  // Because there are some types that can have a [] specified at the end of the name, we kind of have to check that out
+  char * nameptr = *name;
+  while (*nameptr != 0 && *nameptr != '[') nameptr++;
+  if (*nameptr == '[') { // Now the problems begin. We have something something[???]
+    // First : duplicate the entire line into the typebuffer
+    if ((*type = strdup(ptr)) == NULL) {
+      perror("strdup compute_struct_member");
+      *name = NULL;
+      *type = NULL;
+      return;
+    }
+    *free_type = 1;
+
+    // Second : write a 0 instead of the [ in name, we already have a copy to work with
+    *nameptr = 0;
+
+    // Third : Do black magic to remove the name
+    *(savagely_move_string_inplace(*type + (nameptr - ptr), *type + (*name - ptr))) = 0;
   }
 
   *last_space = 0;
@@ -514,14 +595,26 @@ static int register_structure(const char * filename, callback_args params, struc
 
       char * typebuf = NULL;
       char * namebuf = NULL;
+      int free_type = 0;
 
-      compute_struct_member(srcbuf, &typebuf, &namebuf);
+      compute_struct_member(srcbuf, &typebuf, &namebuf, &free_type);
 
+      if (typebuf == NULL || namebuf == NULL) {
+        params->results.fails++;
+        free(structure->members->array);
+        free(structure->members);
+        free(structure->ref);
+        if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+        if (free_type && typebuf != NULL) free(typebuf);
+        return 0;
+      }
       STRCP(namebuf, structure->members->array[i].name, ENTITIES_NAME_LENGTH, 1);
       STRCP(typebuf, structure->members->array[i].type.string, ENTITIES_NAME_LENGTH, 1);
       structure->members->array[i].type.type = NoneType;
       structure->members->array[i].type.ptr = NULL;
       free(data->members_array[i]);
+
+      if (free_type) free(typebuf);
       i++;
     }
   }
