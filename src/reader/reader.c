@@ -14,6 +14,8 @@ static void free_macro(struct macro_spec * macro) {
       free(macro->args);
     }
   }
+
+  free(macro->ref);
 }
 static void free_macro_array(struct macro_indic * macros) {
   if (macros->count > 0) {

@@ -72,6 +72,7 @@ struct macro_spec {
   char placeholder[MACRO_PLACEHOLDER_LENGTH];
   int is_function;
   struct macro_args * args;
+  reference_t ref;
 };
 struct variable {
   reference_t ref;

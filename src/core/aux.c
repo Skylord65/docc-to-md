@@ -145,6 +145,7 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
   return 0;
 }
 
+#define GET_MCOUNT(header, code) ((header) ? (code->definitions.macros.count) : (code->implementations.macros.count))
 static int register_macro(callback_args params, struct status_s * status) {
   struct macro_multiline_status_s * data = (status->data);
   data->content[data->content_index] = 0;
@@ -192,6 +193,13 @@ static int register_macro(callback_args params, struct status_s * status) {
     macro = params->source_code->implementations.macros.array + params->source_code->implementations.macros.count;
     params->source_code->implementations.macros.count++;
   }
+  if ((macro->ref = malloc(sizeof(struct reference))) == NULL) {
+    perror("malloc macro_spec->ref");
+    if (data->is_function) free(args);
+    if (GET_MCOUNT(status->is_header, params->source_code)) free(macro);
+    status->data = NULL;
+    return 1;
+  }
 
   macro->is_function = data->is_function;
   macro->args = args;
@@ -201,6 +209,8 @@ static int register_macro(callback_args params, struct status_s * status) {
   }
   STRCP(data->name, macro->name, ENTITIES_NAME_LENGTH, 1);
   STRCP(data->content, macro->placeholder, data->content_index, 1);
+  macro->ref->line = data->starts_on_line;
+  STRCP((char *)data->filenameptr, macro->ref->filename, PATH_MAX - 1, 1);
 
   free(status->data);
   status->data = NULL;
@@ -211,6 +221,7 @@ return_fail:
   status->data = NULL;
   return 1;
 }
+#undef GET_MCOUNT
 int try_extract_macro(char * buffer, const char * path, callback_args params, struct status_s * status) {
   while (*buffer == ' ') buffer++; // We know the line is not empty
   if (*buffer != '#') return 1;
@@ -241,6 +252,8 @@ int try_extract_macro(char * buffer, const char * path, callback_args params, st
   data->content_index = 0;
   data->in_string = 0;
   data->in_char = 0;
+  data->starts_on_line = status->line_count;
+  data->filenameptr = path;
 
   char * parenthesis = NULL;
   char * word = buffer;

@@ -58,6 +58,8 @@ struct macro_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
   int in_string;
   int in_char;
+  ulint starts_on_line;
+  const char * filenameptr;
 };
 struct struct_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
