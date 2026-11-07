@@ -186,6 +186,10 @@ void recursion_callback(const char * src, callback_args params) {
       try_extract_macro_multiline(buffer, params, &status);
       goto last_bit;
     }
+    if (status.reading_multiline_struct) {
+      try_extract_struct_multiline(buffer, src, params, &status);
+      goto last_bit;
+    }
 
     if (!status.reading_multiline_struct || !status.reading_multiline_macro || !status.reading_function_params) {
       if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
