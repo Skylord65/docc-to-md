@@ -796,7 +796,6 @@ int try_extract_struct_multiline(char * buffer, const char * path, callback_args
     }
   }
   if (status->reading_multiline_struct == 0) {
-    printf("  \x1b[32mTriggering registration through end of multiline\x1b[0m\n");
     return register_structure(path, params, status);
   }
   return 0;
