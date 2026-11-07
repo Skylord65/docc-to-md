@@ -3,6 +3,7 @@
 #include "core/core.h"
 #include "parsers/args.h"
 
+#include <fcntl.h>
 #include <stdio.h>
 
 #define ARG_MISSING(arg) {\
@@ -21,13 +22,32 @@
   return 1;\
 }
 
+void dump(source_code_t code, struct arg_input enable, struct arg_input path) {
+  if (!enable.found) return;
+  if (!path.found || path.str_result == NULL) {
+    fprintf(stderr, "Cannot dump because no file name is specified\n");
+    return;
+  }
+
+  int fd;
+  if ((fd = open(path.str_result, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IROTH | S_IRGRP)) == -1) {
+    perror("open dump file");
+    return;
+  }
+
+  dump_source_code(code, fd);
+
+  close(fd);
+}
 int main(int argc, char * argv[]) {
   struct arg_input args[] = {
     { "--src", "Source directory", String, 0, 0, NULL },
     { "--dest", "Destination directory", String, 0, 0, NULL },
     { "--work", "Work directory", String, 0, 0, "/tmp/docc-to-md" },
     { "--version", "Displays version and exits", Presence, 0, 0, NULL },
-    { "--help", "Displays help and exits", Presence, 0, 0, NULL }
+    { "--help", "Displays help and exits", Presence, 0, 0, NULL },
+    { "-d", "Dump parsed source code to a file. Needs --dump to specify file name", Presence, 0, 0, NULL },
+    { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -66,6 +86,8 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   recursion(config.work, &callback_args, recursion_callback);
+
+  dump(callback_args.source_code, args[5], args[6]);
 
   cleanup(&config);
   free_source_code(callback_args.source_code);
