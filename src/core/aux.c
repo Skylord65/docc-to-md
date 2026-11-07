@@ -385,3 +385,118 @@ int try_extract_macro_multiline(char * buffer, const char * path, callback_args 
   if (status->reading_multiline_macro == 0) return register_macro(params, status);
   return 0;
 }
+
+static void compute_struct_member(char * value, char ** type, char ** name) {
+  char * last_space = NULL;
+  char * first_space = NULL;
+  *type = value;
+  *name = NULL;
+
+  while (*value != 0) {
+    if (*value == ' ') {
+      first_space = value;
+      while (*value == ' ') value++;
+      *name = value;
+      last_space = value - 1;
+    }
+    value++;
+  }
+
+  *last_space = 0;
+  *first_space = 0;
+}
+#define GET_COUNT(is_header, source_code) ((is_header) ? (source_code->definitions.structs.count) : (source_code->implementations.structs.count))
+static int register_structure(const char * filename, callback_args params, struct status_s * status) {
+  struct struct_multiline_status_s * data = status->data;
+
+  struct struct_spec * structure;
+  if (status->is_header) {
+    if (params->source_code->definitions.structs.count == 0) {
+      if ((params->source_code->definitions.structs.array = malloc(sizeof(struct struct_spec))) == NULL) {
+        perror("malloc struct_spec");
+        params->results.fails++;
+        return 0;
+      }
+    } else {
+      if ((params->source_code->definitions.structs.array = realloc(params->source_code->definitions.structs.array, sizeof(struct struct_spec) * (params->source_code->definitions.structs.count + 1))) == NULL) {
+        perror("realloc struct_spec");
+        params->results.fails++;
+        return 0;
+      }
+    }
+
+    structure = params->source_code->definitions.structs.array + params->source_code->definitions.structs.count;
+  } else {
+    if (params->source_code->implementations.structs.count == 0) {
+      if ((params->source_code->implementations.structs.array = malloc(sizeof(struct struct_spec))) == NULL) {
+        perror("malloc struct_spec");
+        params->results.fails++;
+        return 0;
+      }
+    } else {
+      if ((params->source_code->implementations.structs.array = realloc(params->source_code->implementations.structs.array, sizeof(struct struct_spec) * (params->source_code->implementations.structs.count + 1))) == NULL) {
+        perror("realloc struct_spec");
+        params->results.fails++;
+        return 0;
+      }
+    }
+
+    structure = params->source_code->implementations.structs.array + params->source_code->implementations.structs.count;
+  }
+  if ((structure->ref = malloc(sizeof(struct reference))) == NULL) {
+    perror("malloc struct_spec->ref");
+    if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+    params->results.fails++;
+    return 0;
+  }
+  if ((structure->members = malloc(sizeof(struct struct_members))) == NULL) {
+    perror("malloc struct_spec->members");
+    free(structure->ref);
+    if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+    params->results.fails++;
+    return 0;
+  }
+  structure->members->array = NULL;
+  if (data->members_count > 0) {
+    if ((structure->members->array = malloc(sizeof(struct struct_member) * data->members_count)) == NULL) {
+      perror("malloc struct_spec->members->array");
+      free(structure->members);
+      free(structure->ref);
+      if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+      params->results.fails++;
+      return 0;
+    }
+
+    ulint i = 0;
+    while (i < data->members_count) {
+      char srcbuf[ENTITIES_NAME_LENGTH];
+      normalize_type_string(data->members_array[i], srcbuf);
+
+      char * typebuf = NULL;
+      char * namebuf = NULL;
+
+      compute_struct_member(srcbuf, &typebuf, &namebuf);
+
+      STRCP(namebuf, structure->members->array[i].name, ENTITIES_NAME_LENGTH, 1);
+      STRCP(typebuf, structure->members->array[i].type.string, ENTITIES_NAME_LENGTH, 1);
+      structure->members->array[i].type.type = NoneType;
+      structure->members->array[i].type.ptr = NULL;
+      free(data->members_array[i]);
+      i++;
+    }
+  }
+
+  STRCP(data->name, structure->name, ENTITIES_NAME_LENGTH, 1);
+  STRCP((char *)filename, structure->ref->filename, PATH_MAX, 1);
+  structure->members->count = data->members_count;
+  structure->ref->line = data->starts_on_line;
+
+  if (status->is_header) params->source_code->definitions.structs.count++;
+  else params->source_code->implementations.structs.count++;
+
+  if (data->members_array != NULL) free(data->members_array);
+  free(data);
+  status->data = NULL;
+  return 0;
+}
+#undef GET_COUNT

@@ -1,4 +1,5 @@
 #include "reader.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 static void free_macro(struct macro_spec * macro) {
@@ -29,14 +30,14 @@ static void free_structure(struct struct_spec * structure) {
   if (structure->members->count > 0 && structure->members->array != NULL) {
     free(structure->members->array);
   }
+  free(structure->members);
   if (structure->ref != NULL) free(structure->ref);
-  free(structure);
 }
 static void free_structures_array(struct struct_indic * structures) {
   if (structures->count > 0) {
     ulint i = 0;
     while (i < structures->count) {
-      free_structure(&(structures->array[i]));
+      free_structure(structures->array + i);
       i++;
     }
     free(structures->array);
