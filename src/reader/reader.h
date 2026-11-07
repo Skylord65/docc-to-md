@@ -33,7 +33,7 @@ typedef struct {
 // Members types
 struct struct_member {
   char name[ENTITIES_NAME_LENGTH];
-  entity_type_t * type;
+  entity_type_t type;
 };
 struct struct_members {
   ulint count;
