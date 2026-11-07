@@ -125,22 +125,29 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
     }
 
     params->source_code->definitions.variables.array[params->source_code->definitions.variables.count] = (struct variable){
-      .ref = &(struct reference){
-        .line = status->line_count + 1
-      },
       .type = &(entity_type_t){
         .ptr = NULL,
         .type = NoneType,
       }
     };
 
-    struct variable var = params->source_code->definitions.variables.array[params->source_code->definitions.variables.count];
-    STRCP((char *)path, var.ref->filename, PATH_MAX, 1);
-    STRCP(word_before_equal, var.name, ENTITIES_NAME_LENGTH, 1);
-    STRCP(typebuf, var.type->string, ENTITIES_NAME_LENGTH, 1);
+    struct variable * var = params->source_code->definitions.variables.array + params->source_code->definitions.variables.count;
+    if ((var->ref = malloc(sizeof(struct reference))) == NULL) {
+      perror("malloc var->ref");
+      free(var);
+    }
+    if ((var->type = malloc(sizeof(entity_type_t))) == NULL) {
+      perror("malloc var->type");
+      free(var->ref);
+      free(var);
+      return 0;
+    }
+    var->ref->line = status->line_count;
+    STRCP((char *)path, var->ref->filename, PATH_MAX, 1);
+    STRCP(word_before_equal, var->name, ENTITIES_NAME_LENGTH, 1);
+    STRCP(typebuf, var->type->string, ENTITIES_NAME_LENGTH, 1);
 
     params->source_code->definitions.variables.count++;
-
   }
   return 0;
 }

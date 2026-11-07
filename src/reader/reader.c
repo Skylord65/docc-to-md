@@ -45,10 +45,17 @@ static void free_structures_array(struct struct_indic * structures) {
     free(structures->array);
   }
 }
-void free_source_code(source_code_t code) {
-  if (code->definitions.variables.count > 0) {
-    free(code->definitions.variables.array);
+static void free_variables(struct variables_indic * variables) {
+  ulint i = 0;
+  while (i < variables->count) {
+    free(variables->array[i].type);
+    free(variables->array[i].ref);
+    i++;
   }
+  free(variables->array);
+}
+void free_source_code(source_code_t code) {
+  free_variables(&(code->definitions.variables));
   free_macro_array(&(code->definitions.macros));
   free_macro_array(&(code->implementations.macros));
 
