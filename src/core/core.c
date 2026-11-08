@@ -257,8 +257,62 @@ recursion_return_t recursion(const char * input, callback_args params, recursion
   return Ok;
 }
 
+static int rmdirrec(const char * path) {
+  DIR * dir;
+  if ((dir = opendir(path)) == NULL) {
+    perror("opendir rmdirrec");
+    return errno;
+  }
+
+  struct dirent * entry;
+  struct stat sb;
+
+  errno = 0;
+  while ((entry = readdir(dir)) != NULL) {
+    if (IS_SYS_PATH(entry->d_name)) continue;
+
+    char * buffer;
+    if ((buffer = malloc(PATH_MAX)) == NULL) {
+      perror("malloc");
+      goto fail;
+    }
+
+    snprintf(buffer, PATH_MAX, "%s/%s", path, entry->d_name);
+    if (stat(buffer, &sb) == -1) {
+      perror("stat");
+      free(buffer);
+      goto fail;
+    }
+
+    if (S_ISDIR(sb.st_mode)) {
+      int code;
+      if ((code = rmdirrec(buffer)) != 0) {
+        errno = code;
+        free(buffer);
+        goto fail;
+      }
+    free(buffer);
+    } else {
+      int code = remove(buffer);
+      free(buffer);
+      if (code != 0) goto fail;
+    }
+  }
+  if (errno != 0) {
+    perror("readdir");
+fail:
+    closedir(dir);
+    return errno;
+  }
+
+  closedir(dir);
+  return rmdir(path);
+}
 #undef IS_SYS_PATH
 
+int rmdirrf(const char * path) {
+  return rmdirrec(path);
+}
 int create_config(const char * src, const char * dst, const char * work, gen_config_t configp) {
   if (realpath(src, configp->src) == NULL) {
     perror("realpath");
@@ -277,6 +331,15 @@ int create_config(const char * src, const char * dst, const char * work, gen_con
     perror("realpath");
     return 1;
   }
+  if (rmdirrf(configp->work) == -1) {
+    perror("rm work dir for purge");
+    return 1;
+  }
+  if (mkdirp(configp->work) != 0) {
+    perror("mkdirp work back");
+    return 1;
+  }
+
   return 0;
 }
 int mkdirp(const char * path) {

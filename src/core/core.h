@@ -37,6 +37,7 @@ extern void remove_comments_callback(const char * src, callback_args params);
 
 extern int create_config(const char * src, const char * dst, const char * work, gen_config_t);
 extern int mkdirp(const char * path);
+extern int rmdirrf(const char * path);
 extern void cleanup(gen_config_t);
 
 struct status_s {
