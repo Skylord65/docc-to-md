@@ -465,6 +465,7 @@ escape_back:
   char * origin = buffer;
   int * in_string = &(((struct macro_multiline_status_s *)status->data)->in_string);
   int * in_char = &(((struct macro_multiline_status_s *)status->data)->in_char);
+  int dontregister = 0;
   // Start recording the following as macro placeholder
   while (*buffer != '\n') { // A macro ends at the end of the line anyway, if we don't have an end of line, screw it, who writes macro over 2048 caracters anyway ?
     if (IS_STRING_DEL(origin, buffer) && !(*in_char)) *in_string = !(*in_string);
@@ -472,10 +473,13 @@ escape_back:
 
     if (*buffer == '\\' && (*(buffer + 1) == '\n' || *(buffer + 1) == ' ') && !(*in_string) && !(*in_char)) { // We have a \ that is used, not as an escape char but as a line break
       status->reading_multiline_macro = 1;
+      dontregister = 1;
     }
 
-    ((struct macro_multiline_status_s *)status->data)->content[((struct macro_multiline_status_s *)status->data)->content_index] = *buffer;
-    ((struct macro_multiline_status_s *)status->data)->content_index++;
+    if (!dontregister) {
+      ((struct macro_multiline_status_s *)status->data)->content[((struct macro_multiline_status_s *)status->data)->content_index] = *buffer;
+      ((struct macro_multiline_status_s *)status->data)->content_index++;
+    } else dontregister = 0;
     buffer++;
   }
 
@@ -495,6 +499,7 @@ int try_extract_macro_multiline(char * buffer, callback_args params, struct stat
   // This is pretty  straightforward : Just copy until we reach either end of line, or line break (\) followed by some spaces/end of lines
   struct macro_multiline_status_s * data = status->data;
   const char * origin = buffer;
+  int dontregister = 0;
 
   // If we made it here, that's because there is a newline, so, logically, add it
   data->content[(data->content_index)++] = '\n';
@@ -502,10 +507,15 @@ int try_extract_macro_multiline(char * buffer, callback_args params, struct stat
   while (*buffer != '\n') {
     if (IS_STRING_DEL(origin, buffer) && !data->in_char) data->in_string = !data->in_string;
     if (IS_CHAR_DEL(origin, buffer) && !data->in_string) data->in_char = !data->in_char;
-    if (*buffer == '\\' && (*(buffer + 1) == '\n' || *(buffer + 1) == ' ') && !data->in_string && !data->in_char) status->reading_multiline_macro = 1;
+    if (*buffer == '\\' && (*(buffer + 1) == '\n' || *(buffer + 1) == ' ') && !data->in_string && !data->in_char) {
+      status->reading_multiline_macro = 1;
+      dontregister = 1;
+    }
 
-    data->content[data->content_index] = *buffer;
-    data->content_index++;
+    if (!dontregister) {
+      data->content[data->content_index] = *buffer;
+      data->content_index++;
+    } else dontregister = 0;
     buffer++;
   }
 
