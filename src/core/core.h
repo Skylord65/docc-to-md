@@ -61,7 +61,6 @@ struct macro_multiline_status_s {
   int in_string;
   int in_char;
   ulint starts_on_line;
-  const char * filenameptr;
 };
 struct struct_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
@@ -90,7 +89,7 @@ struct function_multiline_status_s {
 extern int normalize_type_string(const char * type, char * typebuf, int with_normalize_newline);
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_macro(char * buffer, const char * path, callback_args args, struct status_s *);
-extern int try_extract_macro_multiline(char * buffer, callback_args, struct status_s *);
+extern int try_extract_macro_multiline(char * buffer, const char * path, callback_args, struct status_s *);
 extern int try_extract_struct(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_struct_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_function(char * buffer, const char * path, callback_args args, struct status_s *);

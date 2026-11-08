@@ -261,11 +261,10 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
 }
 
 #define GET_MCOUNT(header, code) ((header) ? (code->definitions.macros.count) : (code->implementations.macros.count))
-static int register_macro(callback_args params, struct status_s * status) {
+static int register_macro(const char * path, callback_args params, struct status_s * status) {
   struct macro_multiline_status_s * data = (status->data);
   data->content[data->content_index] = 0;
 
-  //printf("Registering macro : %s with : %s\n", data->name, data->content);
   struct macro_spec * macro;
   struct macro_args * args = NULL;
   if (data->is_function && (args = malloc(sizeof(struct macro_args))) == NULL) {
@@ -325,7 +324,7 @@ static int register_macro(callback_args params, struct status_s * status) {
   STRCP(data->name, macro->name, ENTITIES_NAME_LENGTH, 1);
   STRCP(data->content, macro->placeholder, data->content_index, 1);
   macro->ref->line = data->starts_on_line;
-  rebase_path(data->filenameptr, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
+  rebase_path(path, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
 
   if (params->config->verbose_registration) printf("- Registering macro %s (%lu arguments)\n", macro->name, macro->is_function ? macro->args->count : 0);
 
@@ -370,33 +369,26 @@ int try_extract_macro(char * buffer, const char * path, callback_args params, st
   data->in_string = 0;
   data->in_char = 0;
   data->starts_on_line = status->line_count;
-  data->filenameptr = path;
 
   char * parenthesis = NULL;
   char * word = buffer;
   while (*buffer != ' ' && *buffer != '\n') {
     if (*buffer == '(') {
-      ((struct macro_multiline_status_s *)status->data)->is_function = 1;
+      data->is_function = 1;
       *buffer = 0;
       parenthesis = buffer;
     }
 
     buffer++;
   }
-  if (*buffer == '\n') {
-    fprintf(stderr, "    /!\\ Incomplete macro definition in %s:%lld\n", path, status->line_count);
-    free(status->data);
-    status->data = NULL;
-    return 1;
-  }
 
   if (parenthesis != NULL) *parenthesis = 0;
   *buffer = 0;
-  STRCP(word, ((struct macro_multiline_status_s *)status->data)->name, ENTITIES_NAME_LENGTH, 1);
+  STRCP(word, data->name, ENTITIES_NAME_LENGTH, 1);
   *buffer = ' ';
   if (parenthesis != NULL) *parenthesis = '(';
 
-  if (((struct macro_multiline_status_s *)status->data)->is_function) {
+  if (data->is_function) {
     *parenthesis = '(';
 
     // Read arguments for macro
@@ -415,31 +407,31 @@ int try_extract_macro(char * buffer, const char * path, callback_args params, st
       if (*i == ',') {
 register_arg:
         *i = 0;
-        if (((struct macro_multiline_status_s *)status->data)->params_count == 0) {
-          if ((((struct macro_multiline_status_s *)status->data)->array = malloc(sizeof(char *))) == NULL) {
+        if (data->params_count == 0) {
+          if ((data->array = malloc(sizeof(char *))) == NULL) {
             perror("malloc");
             free(status->data);
             status->data = NULL;
             return 1;
           }
         } else {
-          if ((((struct macro_multiline_status_s *)status->data)->array = realloc(((struct macro_multiline_status_s *)status->data)->array, sizeof(char *) * (((struct macro_multiline_status_s *)status->data)->params_count + 1))) == NULL) {
+          if ((data->array = realloc(data->array, sizeof(char *) * (data->params_count + 1))) == NULL) {
             perror("realloc");
-            free(((struct macro_multiline_status_s *)status->data)->array);
+            free(data->array);
             free(status->data);
             status->data = NULL;
             return 1;
           }
         }
 
-        if ((((struct macro_multiline_status_s *)status->data)->array[((struct macro_multiline_status_s *)status->data)->params_count] = strdup(word)) == NULL) {
+        if ((data->array[data->params_count] = strdup(word)) == NULL) {
           perror("strdup");
-          free(((struct macro_multiline_status_s *)status->data)->array);
+          free(data->array);
           free(status->data);
           status->data = NULL;
           return 1;
         };
-        ((struct macro_multiline_status_s *)status->data)->params_count++;
+        data->params_count++;
         if (escape) goto escape_back;
         *i = ',';
         word = i + 1;
@@ -453,12 +445,12 @@ escape_back:
 
     buffer = i + 1;
   } else {
-    *buffer = ' ';
+    if (*buffer != '\n') *buffer = ' ';
   }
 
   while (*buffer == ' ' && *buffer != '\n') buffer++;
   if (*buffer == '\n') {
-    if (((struct macro_multiline_status_s *)status->data)->array != NULL) free(((struct macro_multiline_status_s *)status->data)->array);
+    if (data->array != NULL) free(data->array);
     fprintf(stderr, "    /!\\ Incomplete macro definition in %s:%lld\n", path, status->line_count);
     free(status->data);
     status->data = NULL;
@@ -466,11 +458,11 @@ escape_back:
   }
 
   char * origin = buffer;
-  int * in_string = &(((struct macro_multiline_status_s *)status->data)->in_string);
-  int * in_char = &(((struct macro_multiline_status_s *)status->data)->in_char);
+  int * in_string = &(data->in_string);
+  int * in_char = &(data->in_char);
   int dontregister = 0;
   // Start recording the following as macro placeholder
-  while (*buffer != '\n') { // A macro ends at the end of the line anyway, if we don't have an end of line, screw it, who writes macro over 2048 caracters anyway ?
+  while (*buffer != '\n' && *buffer != 0) { // A macro ends at the end of the line anyway, if we don't have an end of line, screw it, who writes macro over 2048 caracters anyway ?
     if (IS_STRING_DEL(origin, buffer) && !(*in_char)) *in_string = !(*in_string);
     if (IS_CHAR_DEL(origin, buffer) && !(*in_string)) *in_char = !(*in_char);
 
@@ -480,14 +472,14 @@ escape_back:
     }
 
     if (!dontregister) {
-      ((struct macro_multiline_status_s *)status->data)->content[((struct macro_multiline_status_s *)status->data)->content_index] = *buffer;
-      ((struct macro_multiline_status_s *)status->data)->content_index++;
+      data->content[data->content_index] = *buffer;
+      data->content_index++;
     } else dontregister = 0;
     buffer++;
   }
 
   if (status->reading_multiline_macro == 0) {
-    if (register_macro(params, status) != 0) {
+    if (register_macro(path, params, status) != 0) {
       fprintf(stderr, "Unable to register macro for file %s at line %lld\n", path, status->line_count);
       free(status->data);
       status->data = NULL;
@@ -498,7 +490,7 @@ escape_back:
   return 0;
 }
 
-int try_extract_macro_multiline(char * buffer, callback_args params, struct status_s * status) {
+int try_extract_macro_multiline(char * buffer, const char * path, callback_args params, struct status_s * status) {
   // This is pretty  straightforward : Just copy until we reach either end of line, or line break (\) followed by some spaces/end of lines
   struct macro_multiline_status_s * data = status->data;
   const char * origin = buffer;
@@ -522,7 +514,7 @@ int try_extract_macro_multiline(char * buffer, callback_args params, struct stat
     buffer++;
   }
 
-  if (status->reading_multiline_macro == 0) return register_macro(params, status);
+  if (status->reading_multiline_macro == 0) return register_macro(path, params, status);
   return 0;
 }
 static void compute_struct_member(char * value, char ** type, char ** name, int * free_type) {

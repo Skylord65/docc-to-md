@@ -185,7 +185,7 @@ void recursion_callback(const char * src, callback_args params) {
     if (is_line_empty(buffer)) goto last_bit;
 
     if (status.reading_multiline_macro) {
-      try_extract_macro_multiline(buffer, params, &status);
+      try_extract_macro_multiline(buffer, src, params, &status);
       goto last_bit;
     }
     if (status.reading_multiline_struct) {
