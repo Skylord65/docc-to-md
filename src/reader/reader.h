@@ -7,6 +7,17 @@
 #define MACRO_PLACEHOLDER_LENGTH 2048
 
 typedef unsigned long int ulint;
+typedef char fnt_modifier;
+
+#define F_MSTATIC 0x00000001
+#define F_MVOLATI 0x00000010
+#define F_MEXTERN 0x00000100
+
+#define F_ISTATIC(x) (((x) & F_MSTATIC) == F_MSTATIC)
+#define F_IVOLATI(x) (((x) & F_MVOLATI) == F_MVOLATI)
+#define F_IEXTERN(x) (((x) & F_MEXTERN) == F_MEXTERN)
+
+#define F_INONE(x) (!F_ISTATIC(x) && !F_IEXTERN(x) && !F_IVOLATI(x))
 
 struct reference {
   char filename[PATH_MAX];
@@ -51,7 +62,7 @@ struct typedef_spec {
 };
 struct function_arg {
   char name[ENTITIES_NAME_LENGTH];
-  entity_type_t * type;
+  entity_type_t type;
 };
 struct function_args {
   ulint count;
@@ -59,6 +70,8 @@ struct function_args {
 };
 struct function_spec {
   char name[ENTITIES_NAME_LENGTH];
+  entity_type_t returntype;
+  fnt_modifier modifiers;
   reference_t ref;
 
   struct function_args * args;

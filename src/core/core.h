@@ -70,6 +70,19 @@ struct struct_multiline_status_s {
   ulint members_count;
   char ** members_array; // Store them as string, keep the computing when we are sure it is complete
 };
+struct function_multiline_status_s {
+  char name[ENTITIES_NAME_LENGTH];
+  entity_type_t returntype;
+  ulint starts_on_line;
+  int reading_args;
+  int reading_arg;
+  ulint args_count;
+  char ** args; // Store them as string, keep the computing for when we are sure it is acceptable
+  fnt_modifier modifiers;
+  const char * filenameptr;
+  unsigned int words_counted;
+  int is_declaration;
+};
 
 extern int normalize_type_string(const char * type, char * typebuf, int with_normalize_newline);
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
@@ -77,5 +90,7 @@ extern int try_extract_macro(char * buffer, const char * path, callback_args arg
 extern int try_extract_macro_multiline(char * buffer, callback_args, struct status_s *);
 extern int try_extract_struct(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_struct_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int try_extract_function(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int try_extract_function_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 
 #endif

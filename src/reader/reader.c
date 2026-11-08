@@ -1,4 +1,5 @@
 #include "reader.h"
+#include "../macros.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -55,10 +56,25 @@ static void free_variables(struct variables_indic * variables) {
   }
   free(variables->array);
 }
+static void free_function(struct function_spec * function) {
+  if (function->args->count > 0 && function->args->array != NULL) free(function->args->array);
+  free(function->args);
+  free(function->ref);
+}
+static void free_functions(struct function_indic * functions) {
+  ulint i = 0;
+  while (i < functions->count) {
+    free_function(functions->array + i);
+    i++;
+  }
+  if (functions->count > 0 && functions->array != NULL) free(functions->array);
+}
 void free_source_code(source_code_t code) {
   free_variables(&(code->definitions.variables));
   free_macro_array(&(code->definitions.macros));
   free_macro_array(&(code->implementations.macros));
+  free_functions(&(code->implementations.functions));
+  free_functions(&(code->definitions.functions));
 
   free_structures_array(&(code->implementations.structs));
   free_structures_array(&(code->definitions.structs));
@@ -160,7 +176,7 @@ int dump_source_code(const source_code_t code, int fd) {
 
   DUMP("//// Macros");
   if (code->definitions.macros.count > 0) dump_macros(ARGS_V, &(code->definitions.macros));
-  
+
   DUMP("//// Structures");
   if (code->definitions.structs.count > 0) dump_structures(ARGS_V, &(code->definitions.structs));
 

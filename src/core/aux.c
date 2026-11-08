@@ -147,7 +147,7 @@ static char * normalize_variable_input(const char * input, size_t size, int * va
         else output[output_index++] = '*';
       }
     } else if (*input == ' ') {
-      if (output[output_index - 1] != ' ') output[output_index++] = ' ';
+      if (output_index > 0 && output[output_index - 1] != ' ') output[output_index++] = ' ';
     } else if (*input == '[') {
       if (output[output_index - 1] != ' ') output[output_index++] = ' ';
       output[output_index++] = '[';
@@ -189,7 +189,7 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
       }
       var_name = input + i + 1;
     }
-    if (input[i] == '(' || input[i] == '{') { // This is not a variable
+    if (input[i] == ')' || input[i] == '}' || input[i] == '(' || input[i] == '{') { // This is not a variable
       free(input);
       return 0;
     }
@@ -851,3 +851,350 @@ incomplete:
   status->data = NULL;
   return 1;
 }
+
+#define GET_FCOUNT(header, code) ((header) ? (code->definitions.functions.count) : (code->implementations.functions.count))
+#define FREE_DATA(status, data) {\
+  if (data->args_count > 0) {\
+    while (data->args_count > 0) {\
+      free(data->args[data->args_count - 1]);\
+      (data->args_count)--;\
+    }\
+    free(data->args);\
+  };\
+  free(data);\
+  status->data = NULL;\
+}
+static void register_function(const char * path, callback_args params, struct status_s * status) {
+  struct function_multiline_status_s * data = status->data;
+
+  struct function_spec * function;
+  if (status->is_header) {
+    if (params->source_code->definitions.functions.count == 0) {
+      if ((params->source_code->definitions.functions.array = malloc(sizeof(struct function_spec))) == NULL) {
+        perror("malloc struct function_spec");
+        params->results.fails++;
+        return;
+      }
+    } else {
+      if ((params->source_code->definitions.functions.array = realloc(params->source_code->definitions.functions.array, sizeof(struct function_spec) * (params->source_code->definitions.functions.count + 1))) == NULL) {
+        perror("realloc struct function_spec");
+        params->results.fails++;
+        return;
+      }
+    }
+
+    function = params->source_code->definitions.functions.array + params->source_code->definitions.functions.count;
+    params->source_code->definitions.functions.count++;
+  } else {
+    if (params->source_code->implementations.functions.count == 0) {
+      if ((params->source_code->implementations.functions.array = malloc(sizeof(struct function_spec))) == NULL) {
+        perror("malloc struct function_spec");
+        params->results.fails++;
+        return;
+      }
+    } else {
+      if ((params->source_code->implementations.functions.array = realloc(params->source_code->implementations.functions.array, sizeof(struct function_spec) * (params->source_code->implementations.functions.count + 1))) == NULL) {
+        perror("realloc struct function_spec");
+        params->results.fails++;
+        return;
+      }
+    }
+
+    function = params->source_code->implementations.functions.array + params->source_code->implementations.functions.count;
+    params->source_code->implementations.functions.count++;
+  }
+  if ((function->ref = malloc(sizeof(struct reference))) == NULL) {
+    perror("malloc function->ref");
+    if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+    FREE_DATA(status, data);
+    return;
+  }
+  if ((function->args = malloc(sizeof(struct function_args))) == NULL) {
+    perror("malloc function->args");
+    free(function->ref);
+    if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+    FREE_DATA(status, data);
+    return;
+  }
+  function->args->count = data->args_count;
+  if (data->args_count > 0) {
+    if (data->args_count == 1) {
+      if (streq_with_crumb(data->args[0], "void", ' ') == 1) { // This function is actually like fn(void), so no argument is defined
+        function->args->count = 0;
+        function->args->array = NULL;
+        goto if_exit;
+      }
+    }
+    if ((function->args->array = malloc(sizeof(struct function_arg) * data->args_count)) == NULL) {
+      perror("malloc function->args->array");
+      params->results.fails++;
+      free(function->ref);
+      free(function->args);
+      if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+      FREE_DATA(status, data);
+      return;
+    }
+
+    ulint i = 0;
+    while (i < data->args_count) {
+      char * input;
+      int valid;
+      if ((input = normalize_variable_input(data->args[i], ENTITIES_NAME_LENGTH, &valid)) == NULL) {
+        if (!valid) fprintf(stderr, "    /!\\ Invalid function argument construction\n");
+almost_complete_fail:
+        params->results.fails++;
+        free(function->ref);
+        free(function->args->array);
+        free(function->args);
+        if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+        FREE_DATA(status, data);
+        return;
+      }
+
+      char * var_name = input;
+      unsigned j = 0;
+      char * bracket_ptr = NULL;
+      int needs_bracket_operation = 0;
+      while (input[j] != 0) {
+        if (input[j] == ' ') {
+          if (*(input + j + 1) == '[') {
+            needs_bracket_operation = 1;
+            bracket_ptr = input + j + 1;
+            break;
+          }
+          var_name = input + j + 1;
+        }
+        if (input[j] == '(' || input[j] == '{') {
+complete_fail:
+          free(input);
+          goto almost_complete_fail;
+        }
+        j++;
+      }
+      if (var_name == input) {
+        fprintf(stderr, "    /!\\ Incomplete variable definition at %s:%lld (no type)\n", path, status->line_count);
+        goto complete_fail;
+      }
+
+      if (needs_bracket_operation) { // Then we have type variableName [???];
+        swap_word_onwards_inplace(input, var_name, bracket_ptr, ENTITIES_NAME_LENGTH);
+
+        // Retrack the pointers to correct position. Variable name is now the last word
+        char * tmp = var_name;
+        while (*tmp != 0) {
+          if (*tmp == ' ') var_name = tmp + 1;
+          tmp++;
+        }
+      }
+      *(var_name - 1) = 0;
+      STRCP(var_name, function->args->array[i].name, ENTITIES_NAME_LENGTH, 1);
+      STRCP(input, function->args->array[i].type.string, ENTITIES_NAME_LENGTH, 1);
+      function->args->array[i].type.type = NoneType;
+      function->args->array[i].type.ptr = NULL;
+
+      free(input);
+      i++;
+    }
+  } else function->args->array = NULL;
+if_exit:
+
+  STRCP(data->name, function->name, ENTITIES_NAME_LENGTH, 1);
+  STRCP(data->returntype.string, function->returntype.string, ENTITIES_NAME_LENGTH, 1);
+  rebase_path(path, params->config->work, params->config->src, function->ref->filename, PATH_MAX);
+  function->ref->line = data->starts_on_line;
+  function->modifiers = data->modifiers;
+  function->returntype.type = data->returntype.type;
+  function->returntype.ptr = NULL;
+
+  FREE_DATA(status, data);
+
+  return;
+}
+#undef GET_FCOUNT
+static int word_eq(const char * start, const char * word) {
+  while (*start != 0 && *start != ' ' && *word != 0) {
+    if (*start != *word) return 0;
+    start++;
+    word++;
+  }
+  return (*start == 0 || *start == ' ') && *word == 0; // Consumed both strings
+}
+#define SKIP_WORD(buffer) while (*(buffer) != ' ') buffer++;
+
+int try_extract_function(char *buffer, const char *path, callback_args args, struct status_s * status) {
+  // For now we will focus only on oneline functions declarations/implementations
+  // Also, we will ignore functions DECLARATIONS in source files
+  while (*buffer == ' ') buffer++;
+
+  struct function_multiline_status_s * data;
+  if ((data = malloc(sizeof(struct function_multiline_status_s))) == NULL) {
+    perror("malloc function status");
+    args->results.fails++;
+    return 1;
+  }
+  status->data = data;
+  data->modifiers = 0;
+  data->reading_arg = 0;
+  data->reading_args = 0;
+  data->args_count = 0;
+  data->args = NULL;
+  data->returntype.type = NoneType;
+  data->returntype.ptr = NULL;
+  data->returntype.string[0] = 0;
+  data->name[0] = 0;
+  data->starts_on_line = status->line_count;
+  data->filenameptr = path;
+  data->words_counted = 0;
+  data->is_declaration = 0;
+
+  char * start = buffer;
+  char * name = buffer;
+  char * arg_start = buffer;
+  char * arg_check = NULL;
+  char * typestart = buffer;
+  while (*buffer != 0 && *buffer != '\n') {
+    if (!data->reading_args) {
+      if (start == buffer || (*buffer - 1) == ' ') {
+        if (word_eq(buffer, "extern")) {
+          data->modifiers |= F_MEXTERN;
+          SKIP_WORD(buffer);
+          typestart = buffer;
+          continue;
+        }
+        if (word_eq(buffer, "static")) {
+          data->modifiers |= F_MSTATIC;
+          SKIP_WORD(buffer);
+          typestart = buffer;
+          continue;
+        }
+        if (word_eq(buffer, "volatile")) {
+          data->modifiers |= F_MVOLATI;
+          SKIP_WORD(buffer);
+          typestart = buffer;
+          continue;
+        }
+      } // So we determined modifiers... now pay attention to :
+        // 1. Return type
+        // 2. Function name
+        // 3. Arguments
+        // We still don't know if this is actually a function.
+      if (*buffer == ' ') {
+        data->words_counted++;
+        while (*buffer == ' ') buffer++;
+        continue; // Just to get the checks one more time
+      }
+      if (*buffer == '(') { // We must have at least 1 word, preferably 2. If it's one, then the previous char must not be a space
+        if (data->words_counted == 0) goto cleanup_fail;
+        if (data->words_counted == 1 && *(buffer - 1) == ' ') goto cleanup_fail; // It's invalid : word ( is not a function (unless on multiline but fuck multiline for now)
+
+        // We can register types/names for now. We will use some normalization
+        char * input;
+        int valid;
+        *buffer = 0; // Just so we don't overflow. I promise I will repair it afterwards
+        if ((input = normalize_variable_input(typestart, ENTITIES_NAME_LENGTH * 2, &valid)) == NULL) {
+          if (!valid) fprintf(stderr, "   /!\\ Malformed function in %s:%lld\n", path, status->line_count);
+          goto cleanup_fail;
+        }
+        *buffer = '(';
+
+        // For functions it's actually easier since they can't return arrays, we just register then copy
+        unsigned i = 0;
+        while (input[i] != 0) {
+          if (input[i] == ' ') name = input + i + 1;
+          i++;
+        }
+
+        *(name - 1) = 0;
+        STRCP(name, data->name, ENTITIES_NAME_LENGTH, 1);
+        STRCP(input, data->returntype.string, ENTITIES_NAME_LENGTH, 1);
+
+        free(input);
+        data->reading_args = 1;
+        data->reading_arg = 1;
+        arg_start = buffer + 1;
+        arg_check = buffer + 1;
+      }
+    } else {
+      if (*buffer == ')') {
+        data->reading_args = 0;
+        if (arg_check == arg_start) { // We matched maybe 1 argument, maybe 0. Time for backtracking and see  if we reach anything other than a (. If so, we do have an argument
+          char * backtrack = buffer - 1;
+          while (*backtrack != '(') { // We know we have one
+            if (*backtrack != ' ') goto resume;
+            backtrack--;
+          }
+          break; // Cursed aah loop
+        }
+resume:
+        *buffer = 0;
+
+        if (data->args_count == 0) {
+          if ((data->args = malloc(sizeof(struct function_arg))) == NULL) {
+            perror("malloc function_arg");
+            goto cleanup_fail;
+          }
+        } else {
+          if ((data->args = realloc(data->args, (data->args_count + 1) * sizeof(struct function_arg))) == NULL) {
+            perror("realloc function_arg");
+            goto cleanup_fail;
+          }
+        }
+        if ((data->args[data->args_count] = strdup(arg_start)) == NULL) {
+          perror("strdup function argument");
+          goto cleanup_fail;
+        }
+        data->args_count++;
+
+        *buffer = ')';
+        break;
+      } else if (*buffer == ',') {
+        *buffer = 0;
+        if (data->args_count == 0) {
+          if ((data->args = malloc(sizeof(struct function_arg))) == NULL) {
+            perror("malloc function_arg");
+            goto cleanup_fail;
+          }
+        } else {
+          if ((data->args = realloc(data->args, (data->args_count + 1) * sizeof(struct function_arg))) == NULL) {
+            perror("realloc function_arg");
+            goto cleanup_fail;
+          }
+        }
+        if ((data->args[data->args_count] = strdup(arg_start)) == NULL) {
+          perror("strdup function argument");
+          goto cleanup_fail;
+        }
+        data->args_count++;
+        *buffer = ',';
+        arg_start = buffer + 1;
+      }
+    }
+
+    buffer++;
+  }
+
+  if (data->name[0] == 0 || data->returntype.string[0] == 0) { // This was not a function after all
+    goto cleanup_fail;
+  }
+  if (*buffer != 0 && !data->reading_args) {
+    while (*buffer != '{' && *buffer != ';' && *buffer != 0) buffer++;
+    data->is_declaration = *buffer == ';'; // Consider everything else an implementation really
+  }
+  if (data->is_declaration && !status->is_header) {
+    FREE_DATA(status, data);
+    return 0; // We matched something, so skip in the main loop
+  }
+  register_function(path, args, status);
+  return 0;
+
+  int returncode;
+cleanup_fail:
+  returncode = 1;
+  goto cleanup;
+cleanup:
+  FREE_DATA(status, data);
+  return returncode;
+}
+
+#undef SKIP_WORD
+#undef FREE_DATA
