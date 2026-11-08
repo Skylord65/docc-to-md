@@ -123,53 +123,6 @@ static void swap_word_onwards_inplace(char *value, char *a, char *b, size_t max)
   a[second_len + first_len] = 0;
   free(tmp);
 }
-static void swap_words_inplace(char * value, char * a, char * b, size_t max) {
-  if (a > b) {
-    char * c = a;
-    a = b;
-    b = c;
-  }
-
-  char * tmp;
-  if ((tmp = malloc(max)) == NULL) {
-    perror("malloc swap_words_inplace");
-    return;
-  }
-
-  size_t index_tmp = 0;
-  while (value != a) value++; // Go to first word
-  while (value[index_tmp] != ' ') {
-    tmp[index_tmp] = value[index_tmp];
-    index_tmp++;
-  }
-
-  size_t second_word_index = 0;
-  while (b[second_word_index] != 0 && b[second_word_index] != ' ') {
-    value[second_word_index] = b[second_word_index];
-    second_word_index++;
-  }
-  value[second_word_index++] = ' ';
-
-  size_t rewrite_index = 0;
-  while (rewrite_index < index_tmp) {
-    value[second_word_index + rewrite_index] = tmp[rewrite_index];
-    rewrite_index++;
-  }
-
-  free(tmp);
-}
-/*
- * Move everything from `from` to `at`
- * `at` needs to be prior to from, otherwise you wouldn't be calling this function
- */
-static char * savagely_move_string_inplace(char * from, char * at) {
-  while (*from != 0) {
-    *at = *from;
-    at++;
-    from++;
-  }
-  return at;
-}
 static char * normalize_variable_input(const char * input, size_t size, int * valid) {
   char * output;
   *valid = 1;
@@ -214,7 +167,6 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
   if (*buffer == '#') return 1;
 
   char * var_name = buffer;
-  char * type = buffer;
   int valid = 0;
   char * input;
 
@@ -801,7 +753,6 @@ int try_extract_struct(char * buffer, const char * path, callback_args params, s
     goto incomplete;
   }
 
-parse_members:
   if (status->reading_multiline_struct == 0) {
     return register_structure(path, params, status);
   }
