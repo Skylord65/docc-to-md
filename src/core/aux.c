@@ -265,7 +265,7 @@ static int register_macro(callback_args params, struct status_s * status) {
   struct macro_multiline_status_s * data = (status->data);
   data->content[data->content_index] = 0;
 
-  printf("Registering macro : %s with : %s\n", data->name, data->content);
+  //printf("Registering macro : %s with : %s\n", data->name, data->content);
   struct macro_spec * macro;
   struct macro_args * args = NULL;
   if (data->is_function && (args = malloc(sizeof(struct macro_args))) == NULL) {
@@ -1047,6 +1047,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
   data->filenameptr = path;
   data->words_counted = 0;
   data->is_declaration = 0;
+  data->parameter_index = 0;
 
   char * start = buffer;
   char * name = buffer;
@@ -1118,6 +1119,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
     } else {
       if (*buffer == ')') {
         data->reading_args = 0;
+        data->reading_arg = 0;
         if (arg_check == arg_start) { // We matched maybe 1 argument, maybe 0. Time for backtracking and see  if we reach anything other than a (. If so, we do have an argument
           char * backtrack = buffer - 1;
           while (*backtrack != '(') { // We know we have one
@@ -1145,6 +1147,8 @@ resume:
           goto cleanup_fail;
         }
         data->args_count++;
+        data->reading_arg = 0;
+        data->reading_args = 0;
 
         *buffer = ')';
         break;
@@ -1168,6 +1172,7 @@ resume:
         data->args_count++;
         *buffer = ',';
         arg_start = buffer + 1;
+        data->parameter_index = 0;
       }
     }
 
@@ -1185,8 +1190,13 @@ resume:
     FREE_DATA(status, data);
     return 0; // We matched something, so skip in the main loop
   }
-  register_function(path, args, status);
-  return 0;
+  if (!data->reading_args && !data->reading_arg) {
+    register_function(path, args, status);
+    return 0;
+  } else {
+    status->reading_function_params = 1;
+    return 0;
+  }
 
   int returncode;
 cleanup_fail:
@@ -1195,6 +1205,97 @@ cleanup_fail:
 cleanup:
   FREE_DATA(status, data);
   return returncode;
+}
+
+int try_extract_function_multiline(char * buffer, const char * path, callback_args args, struct status_s * status) {
+  status->reading_function_params = 1;
+  struct function_multiline_status_s * data = status->data;
+
+  while (*buffer == ' ') buffer++;
+  // Now we really are looking for
+  // 1. ,
+  // 2. )
+  // If we have nothing, consider it is on the next line
+  while (*buffer != 0) { // Just go
+    if (*buffer == ',') {
+      *buffer = 0;
+      if (data->args_count == 0) {
+        if ((data->args = malloc(sizeof(struct function_arg))) == NULL) {
+          perror("malloc function_arg");
+          goto fail;
+        }
+      } else {
+        if ((data->args = realloc(data->args, (data->args_count + 1) * sizeof(struct function_arg))) == NULL) {
+          perror("realloc function_arg");
+          goto fail;
+        }
+      }
+      data->multiline_parameter_buffer[data->parameter_index] = 0;
+      if ((data->args[data->args_count] = strdup(data->multiline_parameter_buffer)) == NULL) {
+        perror("strdup function argument");
+        goto fail;
+      }
+      data->args_count++;
+      *buffer = ',';
+      data->parameter_index = 0;
+    }
+    if (*buffer == ')') {
+      *buffer = 0;
+      if (data->args_count == 0) {
+        if ((data->args = malloc(sizeof(struct function_arg))) == NULL) {
+          perror("malloc function_arg");
+          goto fail;
+        }
+      } else {
+        if ((data->args = realloc(data->args, (data->args_count + 1) * sizeof(struct function_arg))) == NULL) {
+          perror("realloc function_arg");
+          goto fail;
+        }
+      }
+      data->multiline_parameter_buffer[data->parameter_index] = 0;
+      if ((data->args[data->args_count] = strdup(data->multiline_parameter_buffer)) == NULL) {
+        perror("strdup function argument");
+        goto fail;
+      }
+      data->args_count++;
+      *buffer = ')';
+      data->parameter_index = 0;
+      data->reading_args = 0;
+      data->reading_arg = 0;
+      status->reading_function_params = 0;
+      break;
+    }
+    if (data->reading_arg) {
+      if (*buffer == ' ') {
+        if (data->parameter_index > 0 && data->multiline_parameter_buffer[data->parameter_index - 1] != ' ') data->multiline_parameter_buffer[data->parameter_index++] = ' ';
+      } else if (*buffer != '\n' && *buffer != ',') data->multiline_parameter_buffer[data->parameter_index++] = *buffer;
+    }
+
+    buffer++;
+  }
+
+  if (!(status->reading_function_params)) { // Run some further checks before actually registering it
+    if (data->name[0] == 0 || data->returntype.string[0] == 0) { // This was not a function after all (we never know eh)
+      FREE_DATA(status, data);
+      return 0;
+    }
+    if (*buffer != 0 && !data->reading_args) {
+      while (*buffer != '{' && *buffer != ';' && *buffer != 0) buffer++;
+      data->is_declaration = *buffer == ';'; // Consider everything else an implementation really
+    }
+    if (data->is_declaration && !status->is_header) {
+      FREE_DATA(status, data);
+      return 0;
+    }
+    status->data = data;
+    register_function(path, args, status);
+  }
+  return 0;
+fail:
+  FREE_DATA(status, data);
+  args->results.fails++;
+  status->reading_function_params = 0;
+  return 0;
 }
 
 #undef SKIP_WORD

@@ -82,6 +82,8 @@ struct function_multiline_status_s {
   const char * filenameptr;
   unsigned int words_counted;
   int is_declaration;
+  char multiline_parameter_buffer[ENTITIES_NAME_LENGTH * 2];
+  unsigned int parameter_index;
 };
 
 extern int normalize_type_string(const char * type, char * typebuf, int with_normalize_newline);
