@@ -560,58 +560,55 @@ int try_extract_macro_multiline(char * buffer, callback_args params, struct stat
   if (status->reading_multiline_macro == 0) return register_macro(params, status);
   return 0;
 }
-
 static void compute_struct_member(char * value, char ** type, char ** name, int * free_type) {
-  char * ptr = value;
-  char * last_space = NULL;
-  char * first_space = NULL;
-  *type = value;
+  char * input;
+  int valid;
+  *type = NULL;
   *name = NULL;
   *free_type = 0;
-
-  while (*value != 0) {
-    if (*value == ' ') {
-      first_space = value;
-      while (*value == ' ') value++;
-      if (*value == '[') { // This is a something_somethinng name [] case, with the bracket separated. In that case, just swap them and end up like something_something [] name
-        swap_words_inplace(ptr, *name, value, ENTITIES_NAME_LENGTH);
-        // Now find the new name and track it, we will glide to the end and then make our way back from there
-        while (*value != 0) value++;
-        while (*value != ' ') value--;
-        *name = value + 1;
-        last_space = value;
-
-        while (*value == ' ') value --;
-        first_space = value + 1;
-      } else {
-        *name = value;
-        last_space = value - 1;
-      }
-    }
-    value++;
+  if ((input = normalize_variable_input(value, ENTITIES_NAME_LENGTH, &valid)) == NULL) {
+    if (!valid) fprintf(stderr, "    /!\\ Incomplete member type\n");
+    return;
   }
-  // Because there are some types that can have a [] specified at the end of the name, we kind of have to check that out
-  char * nameptr = *name;
-  while (*nameptr != 0 && *nameptr != '[') nameptr++;
-  if (*nameptr == '[') { // Now the problems begin. We have something something[???]
-    // First : duplicate the entire line into the typebuffer
-    if ((*type = strdup(ptr)) == NULL) {
-      perror("strdup compute_struct_member");
-      *name = NULL;
-      *type = NULL;
+
+  *free_type = 1;
+  // We now have a normalized input, with no ';', no newline, and one space between each word
+  unsigned i = 0;
+  char * bracket_ptr = NULL;
+  int needs_bracket_operation = 0;
+  while (input[i] != 0) {
+    if (input[i] == ' ') {
+      if (*(input + i + 1) == '[') {// This is not the actual name
+        needs_bracket_operation = 1;
+        bracket_ptr = input + i + 1;
+        break;
+      }
+      *name = input + i + 1;
+    }
+    if (input[i] == '(' || input[i] == '{') { // This is not a variable
+      free(input);
       return;
     }
-    *free_type = 1;
-
-    // Second : write a 0 instead of the [ in name, we already have a copy to work with
-    *nameptr = 0;
-
-    // Third : Do black magic to remove the name
-    *(savagely_move_string_inplace(*type + (nameptr - ptr), *type + (*name - ptr))) = 0;
+    i++;
+  }
+  if (*name == input) {
+    fprintf(stderr, "    /!\\ Incomplete struct member definition\n");
+    free(input);
+    return;
   }
 
-  *last_space = 0;
-  *first_space = 0;
+  if (needs_bracket_operation) { // Then we have type variableName [???];
+    swap_word_onwards_inplace(input, *name, bracket_ptr, ENTITIES_NAME_LENGTH);
+
+    // Retrack the pointers to correct position. Variable name is now the last word
+    char * tmp = *name;
+    while (*tmp != 0) {
+      if (*tmp == ' ') *name = tmp + 1;
+      tmp++;
+    }
+  }
+  *((*name) - 1) = 0;
+  *type = input;
 }
 #define GET_COUNT(is_header, source_code) ((is_header) ? (source_code->definitions.structs.count) : (source_code->implementations.structs.count))
 static int register_structure(const char * filename, callback_args params, struct status_s * status) {
