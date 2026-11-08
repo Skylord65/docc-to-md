@@ -17,7 +17,7 @@ SOURCES := $(wildcard $(SRC_DIR)/*.c) \
 BUILD_DIRS := $(sort $(dir $(patsubst $(SRC_DIR)/%,$(BUILD_DIR)/%,$(SOURCES))))
 OBJECTS=$(SOURCES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
-INT_VARS :=
+INT_VARS := DEBUG
 VARS :=
 
 MACRO_FLAGS := $(strip $(foreach v,$(VARS),\
