@@ -54,7 +54,7 @@ int normalize_type_string(const char * type, char * typebuf, int with_replace_ne
         type++;
       } else type++;
     } else {
-      if (*type == '\n') break;
+      if (*type == '\n' && with_replace_newline) break;
       *typebuf = *type;
       typebuf++;
       type++;
