@@ -47,7 +47,8 @@ int main(int argc, char * argv[]) {
     { "--version", "Displays version and exits", Presence, 0, 0, NULL },
     { "--help", "Displays help and exits", Presence, 0, 0, NULL },
     { "-d", "Dump parsed source code to a file. Needs --dump to specify file name", Presence, 0, 0, NULL },
-    { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL }
+    { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL },
+    { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -70,6 +71,7 @@ int main(int argc, char * argv[]) {
     fprintf(stderr, "Failed to parse config\n");
     return 1;
   }
+  config.verbose_registration = args[7].found;
 
   struct callback_args_s callback_args = {
     .config = &config,

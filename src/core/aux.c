@@ -327,6 +327,8 @@ static int register_macro(callback_args params, struct status_s * status) {
   macro->ref->line = data->starts_on_line;
   rebase_path(data->filenameptr, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
 
+  if (params->config->verbose_registration) printf("- Registering macro %s (%lu arguments)\n", macro->name, macro->is_function ? macro->args->count : 0);
+
   free(status->data);
   status->data = NULL;
   return 0;
@@ -677,6 +679,9 @@ static int register_structure(const char * filename, callback_args params, struc
   if (data->members_array != NULL) free(data->members_array);
   free(data);
   status->data = NULL;
+
+  if (params->config->verbose_registration) printf("- Registering structure %s (%lu members)\n", structure->name, structure->members->count);
+
   return 0;
 }
 #undef GET_COUNT
@@ -1008,6 +1013,8 @@ if_exit:
   function->returntype.ptr = NULL;
 
   FREE_DATA(status, data);
+
+  if (params->config->verbose_registration) printf("- Registering function %s (%lu arguments)\n", function->name, function->args->count);
 
   return;
 }
