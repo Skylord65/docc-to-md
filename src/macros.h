@@ -28,7 +28,7 @@
   }\
 }
 
-#if defined(DEBUG) && DEBUG == 1
+#if defined(DEBUG) && DEBUG == 1 && !defined(NODBG)
 #define DBG(instruction) {\
   printf("\x1b[32m    ");\
   instruction;\

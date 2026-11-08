@@ -1,7 +1,7 @@
 CC=gcc
 FLAGS=-Wall -Wextra -Wundef -Wpedantic -g
 SANTS=-fsanitize=address,undefined
-CLEANBUILD_FLAGS=-O3
+CLEANBUILD_FLAGS=-O3 -DNODBG
 LIBS_FLAG=
 
 SRC_DIR=src
