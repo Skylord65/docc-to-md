@@ -22,7 +22,7 @@ static int check_variable_type_name_against_keywords(char * typebuf) {
   if (*first_space == 0) return 0;
 
   *first_space = 0;
-  if (streq("extern", first_word) || streq("static", first_word) || streq("volatine", first_word)) {
+  if (streq("extern", first_word) || streq("static", first_word) || streq("volatile", first_word)) {
     // Skip this word
     *first_space = ' ';
     while (*first_space == ' ' && *first_space != 0) first_space++;
