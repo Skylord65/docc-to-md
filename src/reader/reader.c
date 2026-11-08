@@ -64,30 +64,30 @@ void free_source_code(source_code_t code) {
   free_structures_array(&(code->definitions.structs));
 }
 
-#define DUMP_WRITE(buffer, fd, instruction) {\
-  size_t bytes = instruction;\
+#define ARGS_T char * buffer, int fd
+#define ARGS_V buffer, fd
+#define DUMP(...) {\
+  size_t bytes = snprintf(buffer, BUFSIZ, __VA_ARGS__);\
   write(fd, buffer, bytes);\
   write(fd, "\n", 1);\
 }
-#define ARGS_T char * buffer, int fd
-#define ARGS_V buffer, fd
 
 static void dump_macros(ARGS_T, struct macro_indic * macros) {
   ulint i = 0;
   while (i < macros->count) {
     struct macro_spec * macro = macros->array + i;
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "Defined in %s:%lu \n#define %s %s", macro->ref->filename, macro->ref->line, macro->name, macro->placeholder));
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "------- Arguments :"));
+    DUMP("Defined in %s:%lu \n#define %s %s", macro->ref->filename, macro->ref->line, macro->name, macro->placeholder);
+    DUMP("------- Arguments :");
 
-    if (!macro->is_function || macro->args->count == 0) DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "   [None]"))
+    if (!macro->is_function || macro->args->count == 0) DUMP("   [None]")
     else {
       ulint j = 0;
       while (j < macro->args->count) {
-        DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "   - %s", macro->args->array[j]));
+        DUMP("   - %s", macro->args->array[j]);
         j++;
       }
     }
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, " "));
+    DUMP(" ");
     i++;
   }
 }
@@ -95,7 +95,7 @@ static void dump_variables(ARGS_T, struct variables_indic * variables) {
   ulint i = 0;
   while (i < variables->count) {
     struct variable * variable = variables->array + i;
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "Defined in %s:%lu\n  Type: %s\n  Name: %s\n", variable->ref->filename, variable->ref->line, variable->type->string, variable->name))
+    DUMP("Defined in %s:%lu\n  Type: %s\n  Name: %s\n", variable->ref->filename, variable->ref->line, variable->type->string, variable->name)
     i++;
   }
 }
@@ -103,47 +103,84 @@ static void dump_structures(ARGS_T, struct struct_indic * structures) {
   ulint i = 0;
   while (i < structures->count) {
     struct struct_spec * structure = structures->array + i;
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "/Structure %s\nDefined in %s:%lu\nstruct %s {\n", structure->name, structure->ref->filename, structure->ref->line, structure->name));
+    DUMP("/Structure %s\nDefined in %s:%lu\nstruct %s {", structure->name, structure->ref->filename, structure->ref->line, structure->name);
 
     ulint j = 0;
     while (j < structure->members->count) {
-      DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, " %s %s", structure->members->array[j].name, structure->members->array[j].type.string))
+      DUMP(" %s %s", structure->members->array[j].type.string, structure->members->array[j].name)
       j++;
     }
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ,  "}\n------ Members :"));
+    DUMP( "}\n------ Members :");
     j = 0;
     while (j < structure->members->count) {
-      DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, " - [%s], type : %s\n", structure->members->array[j].name, structure->members->array[j].type.string));
+      DUMP(" - [%s], type : %s", structure->members->array[j].name, structure->members->array[j].type.string);
       j++;
     }
-    if (j == 0) DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "[ NONE ]"));
+    if (j == 0) DUMP("[ NONE ]");
     i++;
-    DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, " "));
+    DUMP(" ");
+  }
+}
+static void dump_function(ARGS_T, struct function_spec * function) {
+  DUMP("Defined in %s:%lu\n  NAME: %s\n  Modifiers :", function->ref->filename, function->ref->line, function->name);
+
+  if (F_INONE(function->modifiers)) DUMP("    - [NONE]")
+  else {
+    if (F_ISTATIC(function->modifiers)) DUMP("   - static");
+    if (F_IEXTERN(function->modifiers)) DUMP("   - extern");
+    if (F_IVOLATI(function->modifiers)) DUMP("   - volatile");
+  }
+
+  DUMP(" Arguments : ");
+  if (function->args->count == 0) DUMP("    - [NONE]")
+  else {
+    ulint i = 0;
+    while (i < function->args->count) {
+      struct function_arg * arg = function->args->array + i;
+      DUMP("    - %s : %s", arg->name, arg->type.string);
+      i++;
+    }
+  }
+
+  DUMP("  Returns : %s\n", function->returntype.string);
+}
+static void dump_functions(ARGS_T, struct function_indic * functions) {
+  ulint i = 0;
+  while (i < functions->count) {
+    dump_function(buffer, fd, functions->array + i);
+    i++;
   }
 }
 int dump_source_code(const source_code_t code, int fd) {
   char buffer[BUFSIZ];
 
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "// Headers //"));
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "//// Variables"));
+  DUMP("// Headers //");
+  DUMP("//// Variables");
   if (code->definitions.variables.count > 0) dump_variables(ARGS_V, &(code->definitions.variables));
 
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "//// Macros"));
+  DUMP("//// Macros");
   if (code->definitions.macros.count > 0) dump_macros(ARGS_V, &(code->definitions.macros));
   
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "//// Structures"));
+  DUMP("//// Structures");
   if (code->definitions.structs.count > 0) dump_structures(ARGS_V, &(code->definitions.structs));
 
+  DUMP("//// Functions");
+  dump_functions(ARGS_V, &(code->definitions.functions));
 
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "\n\n// Core code //"));
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "//// Macros"));
+
+  DUMP("\n\n// Core code //");
+  DUMP("//// Macros");
   if (code->implementations.macros.count > 0) dump_macros(ARGS_V, &(code->implementations.macros));
 
-  DUMP_WRITE(buffer, fd, snprintf(buffer, BUFSIZ, "//// Structures"));
-  if (code->definitions.structs.count > 0) dump_structures(ARGS_V, &(code->definitions.structs));
+  DUMP("//// Structures");
+  if (code->implementations.structs.count > 0) dump_structures(ARGS_V, &(code->implementations.structs));
+
+  DUMP("//// Functions");
+  dump_functions(ARGS_V, &(code->implementations.functions));
 
   return 0;
 }
 
 #undef ARGS_T
 #undef ARGS_V
+#undef DUMP
