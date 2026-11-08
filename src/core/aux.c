@@ -1,6 +1,7 @@
 #include "core.h"
 #include "../parsers/stringlib.h"
 #include "../macros.h"
+#include "../debug.h"
 #include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1054,7 +1055,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
   char * typestart = buffer;
   while (*buffer != 0 && *buffer != '\n') {
     if (!data->reading_args) {
-      if (start == buffer || (*buffer - 1) == ' ') {
+      if (start == buffer || *(buffer - 1) == ' ') {
         if (word_eq(buffer, "extern")) {
           data->modifiers |= F_MEXTERN;
           SKIP_WORD(buffer);
