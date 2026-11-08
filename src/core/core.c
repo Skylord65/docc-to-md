@@ -174,7 +174,9 @@ void recursion_callback(const char * src, callback_args params) {
     .in_function = 0,
     .reading_function_params = 0,
     .reading_multiline_macro = 0,
-    .reading_multiline_struct = 0
+    .reading_multiline_struct = 0,
+    .line_count = 1,
+    .data = NULL,
   };
 
   char buffer[LINE_BUFFER_SIZE];
