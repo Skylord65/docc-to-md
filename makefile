@@ -1,7 +1,7 @@
 CC=gcc
 FLAGS=-Wall -Wextra -Wundef -Wpedantic -g
 SANTS=-fsanitize=address,undefined
-CLEANBUILD_FLAGS=-O3 -DNODBG
+CLEANBUILD_FLAGS=-O3 -DNODEBUG
 LIBS_FLAG=
 
 SRC_DIR=src
@@ -17,7 +17,7 @@ SOURCES := $(wildcard $(SRC_DIR)/*.c) \
 BUILD_DIRS := $(sort $(dir $(patsubst $(SRC_DIR)/%,$(BUILD_DIR)/%,$(SOURCES))))
 OBJECTS=$(SOURCES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
-INT_VARS := DEBUG
+INT_VARS := NODEBUG DISABLE_DEBUG
 VARS :=
 
 MACRO_FLAGS := $(strip $(foreach v,$(VARS),\
