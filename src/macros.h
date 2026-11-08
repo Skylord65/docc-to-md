@@ -27,4 +27,15 @@
     s++;\
   }\
 }
+
+#if defined(DEBUG) && DEBUG == 1
+#define DBG(instruction) {\
+  printf("\x1b[32m    ");\
+  instruction;\
+  printf("\x1b[0m\n");\
+}
+#else
+#define DBG(instruction)
+#endif
+
 #endif

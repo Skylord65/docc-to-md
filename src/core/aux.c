@@ -39,7 +39,7 @@ static int check_variable_type_name_against_keywords(char * typebuf) {
   *first_space = ' ';
   return is_not_variable;
 }
-int normalize_type_string(const char * type, char * typebuf) {
+int normalize_type_string(const char * type, char * typebuf, int with_replace_newline) {
   int skip_first_word = starts_with(type, "extern") || starts_with(type, "static") || starts_with(type, "volatile");
   if (skip_first_word) {
     while (*type != ' ' && *type != 0) type++;
@@ -54,6 +54,7 @@ int normalize_type_string(const char * type, char * typebuf) {
         type++;
       } else type++;
     } else {
+      if (*type == '\n') break;
       *typebuf = *type;
       typebuf++;
       type++;
@@ -83,64 +84,195 @@ static void rebase_path(const char * path, const char * replace, const char * by
   }
   buffer[bufindex] = 0;
 }
+static void swap_word_onwards_inplace(char *value, char *a, char *b, size_t max) {
+  if (a > b) {
+    char *c = a;
+    a = b;
+    b = c;
+  }
+  if (a < value) return;
+  while (value != a) value++;
+
+  size_t first_len = 0;
+  while (a[first_len] != ' ' && a[first_len] != 0) first_len++;
+  size_t second_len = strlen(b);
+
+  char *tmp = malloc(max);
+  if (tmp == NULL) {
+    perror("malloc swap_word_onwards_inplace");
+    return;
+  }
+
+  size_t i = 0;
+  while (i < first_len) {
+    tmp[i] = a[i];
+    i++;
+  }
+  tmp[first_len] = 0;
+  i = 0;
+  while (i <= second_len) {
+    a[i] = b[i];
+    i++;
+  }
+  a[second_len++] = ' ';
+  i = 0;
+  while (i < first_len) {
+    a[second_len + i] = tmp[i];
+    i++;
+  }
+  a[second_len + first_len] = 0;
+  free(tmp);
+}
+static void swap_words_inplace(char * value, char * a, char * b, size_t max) {
+  if (a > b) {
+    char * c = a;
+    a = b;
+    b = c;
+  }
+
+  char * tmp;
+  if ((tmp = malloc(max)) == NULL) {
+    perror("malloc swap_words_inplace");
+    return;
+  }
+
+  size_t index_tmp = 0;
+  while (value != a) value++; // Go to first word
+  while (value[index_tmp] != ' ') {
+    tmp[index_tmp] = value[index_tmp];
+    index_tmp++;
+  }
+
+  size_t second_word_index = 0;
+  while (b[second_word_index] != 0 && b[second_word_index] != ' ') {
+    value[second_word_index] = b[second_word_index];
+    second_word_index++;
+  }
+  value[second_word_index++] = ' ';
+
+  size_t rewrite_index = 0;
+  while (rewrite_index < index_tmp) {
+    value[second_word_index + rewrite_index] = tmp[rewrite_index];
+    rewrite_index++;
+  }
+
+  free(tmp);
+}
+/*
+ * Move everything from `from` to `at`
+ * `at` needs to be prior to from, otherwise you wouldn't be calling this function
+ */
+static char * savagely_move_string_inplace(char * from, char * at) {
+  while (*from != 0) {
+    *at = *from;
+    at++;
+    from++;
+  }
+  return at;
+}
+static char * normalize_variable_input(const char * input, size_t size, int * valid) {
+  char * output;
+  *valid = 1;
+  if ((output = malloc(size)) == NULL) {
+    perror("malloc normalize_variable_type");
+    return NULL;
+  }
+
+  unsigned int output_index = 0;
+  while (*input != 0) {
+    if (*input == '=' || *input == ';') break;
+    if (*input == '*') {
+      if (output_index == 0) { // We have some strange type here : * name;
+        *valid = 0;
+        free(output);
+        return NULL;
+      }
+      if (output[output_index - 1] == '*') output[output_index++] = '*';
+      else {
+        if (output[output_index - 1] != ' ') output[output_index++] = ' ';
+        if (output[output_index - 1] == ' ' && output[output_index - 2] == '*') output[output_index - 1] = '*';
+        else output[output_index++] = '*';
+      }
+    } else if (*input == ' ') {
+      if (output[output_index - 1] != ' ') output[output_index++] = ' ';
+    } else if (*input == '[') {
+      if (output[output_index - 1] != ' ') output[output_index++] = ' ';
+      output[output_index++] = '[';
+    } else {
+      if (output_index > 0 && output[output_index - 1] == '*') output[output_index++] = ' ';
+      output[output_index++] = *input;
+    }
+    input++;
+  }
+  if (output_index > 0 && output[output_index - 1] == ' ') output[output_index - 1] = 0;
+  output[output_index] = 0;
+
+  return output;
+}
 int try_extract_variable(char * buffer, const char * path, callback_args params, struct status_s * status) {
+  while (*buffer == ' ') buffer++;
   if (*buffer == '#') return 1;
 
-  char * ptr = (char *)buffer;
-  char * word_before_equal = buffer;
+  char * var_name = buffer;
   char * type = buffer;
-  char * equals = NULL;
-  char typebuf[ENTITIES_NAME_LENGTH];
+  int valid = 0;
+  char * input;
 
-  while (*ptr != '\n' && (*ptr != '=' && *ptr != ';')) ptr++;
-  if (*ptr != '=' && *ptr != ';') return 1; // In case we have something like : unsigned long int i;, treat ';' as '=' (does the  same thing)
-  equals = ptr;
+  if (check_variable_type_name_against_keywords(buffer) == 1) return 1; // We actually have a variable then
 
-  if (*(ptr - 1) == ' ') {
-    ptr--;
-    while (*ptr == ' ' && ptr != buffer) ptr--;
-  } else ptr--;
-  if (ptr == buffer) {
-    fprintf(stderr, "    /!\\ Incomplete variable at %s:%lld\n", path, status->line_count);
-    return 1;
+  if ((input = normalize_variable_input(buffer, ENTITIES_NAME_LENGTH, &valid)) == NULL) {
+    if (!valid) fprintf(stderr, "    /!\\ Invalid variable definition at %s:%lld\n", path, status->line_count);
+    return 0;
+  }
+  // We now have a normalized input, with no ';', no newline, and one space between each word
+  unsigned i = 0;
+  char * bracket_ptr = NULL;
+  int needs_bracket_operation = 0;
+  while (input[i] != 0) {
+    if (input[i] == ' ') {
+      if (*(input + i + 1) == '[') {// This is not the actual name
+        needs_bracket_operation = 1;
+        bracket_ptr = input + i + 1;
+        break;
+      }
+      var_name = input + i + 1;
+    }
+    if (input[i] == '(' || input[i] == '{') { // This is not a variable
+      free(input);
+      return 0;
+    }
+    i++;
+  }
+  if (var_name == buffer) {
+    fprintf(stderr, "    /!\\ Incomplete variable definition at %s:%lld (no type)\n", path, status->line_count);
+    free(input);
+    return 0;
   }
 
-  if (*ptr == ')' || *ptr == '}') return 1; // This is the end of a function/structure/typedef
-  // Find the first word backwards
-  while (*ptr != ' ' && ptr != buffer) {
-    if (*ptr == '(' || *ptr == '{') return 1; // This is the start of a function/structure/typedef in the name
-    ptr--;
+  if (needs_bracket_operation) { // Then we have type variableName [???];
+    swap_word_onwards_inplace(input, var_name, bracket_ptr, ENTITIES_NAME_LENGTH);
+
+    // Retrack the pointers to correct position. Variable name is now the last word
+    char * tmp = var_name;
+    while (*tmp != 0) {
+      if (*tmp == ' ') var_name = tmp + 1;
+      tmp++;
+    }
   }
-  if (ptr == buffer) {
-    fprintf(stderr, "    /!\\ Incomplete variable at %s:%lld\n", path, status->line_count);
-    return 1;
-  }
-  word_before_equal = ptr + 1;
-
-  while (*ptr == ' ' && ptr != buffer) ptr--;
-  if (ptr == buffer) {
-    fprintf(stderr, "    /!\\ Incomplete variable at %s:%lld\n", path, status->line_count);
-    return 1;
-  }
-
-  *(ptr + 1) = 0;
-  *equals = 0;
-
-  if (check_variable_type_name_against_keywords(type) == 1) return 1;
-  normalize_type_string(type, typebuf);
-
-  printf("Variable type is : %s and variable name is %s\n", typebuf, word_before_equal);
+  *(var_name - 1) = 0;
 
   if (status->is_header) {
     if (params->source_code->definitions.variables.count == 0) {
       if ((params->source_code->definitions.variables.array = malloc(sizeof(struct variable))) == NULL) {
         perror("malloc");
+        free(input);
         params->results.fails++;
         return 1;
       }
     } else if ((params->source_code->definitions.variables.array = realloc(params->source_code->definitions.variables.array, sizeof(struct variable) * (params->source_code->definitions.variables.count + 1))) == NULL) {
       perror("realloc");
       params->results.fails++;
+      free(input);
       return 1;
     }
 
@@ -155,20 +287,23 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
     if ((var->ref = malloc(sizeof(struct reference))) == NULL) {
       perror("malloc var->ref");
       free(var);
+      free(input);
     }
     if ((var->type = malloc(sizeof(entity_type_t))) == NULL) {
       perror("malloc var->type");
       free(var->ref);
       free(var);
+      free(input);
       return 0;
     }
     var->ref->line = status->line_count;
     rebase_path(path, params->config->work, params->config->src, var->ref->filename, PATH_MAX);
-    STRCP(word_before_equal, var->name, ENTITIES_NAME_LENGTH, 1);
-    STRCP(typebuf, var->type->string, ENTITIES_NAME_LENGTH, 1);
+    STRCP(var_name, var->name, ENTITIES_NAME_LENGTH, 1);
+    STRCP(input, var->type->string, ENTITIES_NAME_LENGTH, 1);
 
     params->source_code->definitions.variables.count++;
   }
+  free(input);
   return 0;
 }
 
@@ -426,54 +561,6 @@ int try_extract_macro_multiline(char * buffer, callback_args params, struct stat
   return 0;
 }
 
-static void swap_words_inplace(char * value, char * a, char * b, size_t max) {
-  if (a > b) {
-    char * c = a;
-    a = b;
-    b = c;
-  }
-
-  char * tmp;
-  if ((tmp = malloc(max)) == NULL) {
-    perror("malloc swap_words_inplace");
-    return;
-  }
-
-  size_t index_tmp = 0;
-  while (value != a) value++; // Go to first word
-  while (value[index_tmp] != ' ') {
-    tmp[index_tmp] = value[index_tmp];
-    index_tmp++;
-  }
-
-  size_t second_word_index = 0;
-  while (b[second_word_index] != 0 && b[second_word_index] != ' ') {
-    value[second_word_index] = b[second_word_index];
-    second_word_index++;
-  }
-  value[second_word_index++] = ' ';
-
-  size_t rewrite_index = 0;
-  while (rewrite_index < index_tmp) {
-    value[second_word_index + rewrite_index] = tmp[rewrite_index];
-    rewrite_index++;
-  }
-
-  free(tmp);
-}
-/*
- * Move everything from `from` to `at`
- * `at` needs to be prior to from, otherwise you wouldn't be calling this function
- */
-static char * savagely_move_string_inplace(char * from, char * at) {
-  while (*from != 0) {
-    *at = *from;
-    at++;
-    from++;
-  }
-  return at;
-}
-
 static void compute_struct_member(char * value, char ** type, char ** name, int * free_type) {
   char * ptr = value;
   char * last_space = NULL;
@@ -591,7 +678,7 @@ static int register_structure(const char * filename, callback_args params, struc
     ulint i = 0;
     while (i < data->members_count) {
       char srcbuf[ENTITIES_NAME_LENGTH];
-      normalize_type_string(data->members_array[i], srcbuf);
+      normalize_type_string(data->members_array[i], srcbuf, 0);
 
       char * typebuf = NULL;
       char * namebuf = NULL;
