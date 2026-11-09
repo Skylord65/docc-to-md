@@ -28,3 +28,16 @@ makepkg -siCcf
 ### From repository
 
 When it will be finished, it will be released, it will be available on my [forgejo packages repository page](https://git.greensky.tf/Greensky/-/packages), auto compiled and published by the [PKGBUILDING](https://git.greensky.tf/Greensky/PKGBUILDING) repository
+
+## Contact
+
+Since the code makes a lot of assumptions and purposely ignores some valid C cases, like :
+```c
+enum Thing
+{
+
+};
+```
+is not recognized as an enum.
+
+If you want to help to improve the project, and/or have any request regarding the project, please contact me on [this discord server](https://discord.gg/fHyN5w84g6), or by email
