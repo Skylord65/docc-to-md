@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../parsers/stringlib.h"
 #include "../parsers/parsers.h"
 #include "../macros.h"
@@ -962,18 +963,22 @@ almost_complete_fail:
           var_name = input + j + 1;
         }
         if (input[j] == '(' || input[j] == '{') {
-complete_fail:
           free(input);
           goto almost_complete_fail;
         }
         j++;
       }
-      if (var_name == input) {
-        fprintf(stderr, "    /!\\ Incomplete variable definition at %s:%lld (no type)\n", path, status->line_count);
-        goto complete_fail;
+      int replaced = 0;
+      char * zero = var_name;
+      if (var_name == input || *var_name == '*') { // That's the case when we have only 1 word, so it has to be a type
+                                                   // Or the case when it is a pointer
+        char namebuf[ENTITIES_NAME_LENGTH];
+        snprintf(namebuf, ENTITIES_NAME_LENGTH, "__arg_no_%lu", i + 1);
+        var_name = namebuf;
+        replaced = 1;
       }
 
-      if (needs_bracket_operation) { // Then we have type variableName [???];
+      if (needs_bracket_operation && !replaced) { // Then we have type variableName [???];
         swap_word_onwards_inplace(input, var_name, bracket_ptr, ENTITIES_NAME_LENGTH);
 
         // Retrack the pointers to correct position. Variable name is now the last word
@@ -983,7 +988,7 @@ complete_fail:
           tmp++;
         }
       }
-      *(var_name - 1) = 0;
+      if (!replaced) *(zero - 1) = 0;
       STRCP(var_name, function->args->array[i].name, ENTITIES_NAME_LENGTH, 1);
       STRCP(input, function->args->array[i].type.string, ENTITIES_NAME_LENGTH, 1);
       function->args->array[i].type.type = NoneType;
