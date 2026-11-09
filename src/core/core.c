@@ -1,5 +1,6 @@
 #include "core.h"
 #include "../macros.h"
+#include "../parsers/stringlib.h"
 
 #include <unistd.h>
 #include <errno.h>
@@ -447,7 +448,7 @@ void register_doccumments_callback(const char * src, callback_args params) {
         struct function_spec * function = NULL;
         ulint i = 0;
         while (i < indicator->count) {
-          if (indicator->array[i].ref->line == linecount || indicator->array[i].ref->line == linecount + 1) {// We do have a function (on this line or on another one), mark it, and proceed
+          if ((indicator->array[i].ref->line == linecount || indicator->array[i].ref->line == linecount + 1) && streq(indicator->array[i].ref->filename, (char *)src)) {// We do have a function (on this line or on another one), mark it, and proceed
             function = indicator->array + i;
             break;
           }
@@ -516,6 +517,7 @@ void register_doccumments_callback(const char * src, callback_args params) {
           function->description = NULL;
         }
         if (params->config->verbose_registration) printf("- Registering comment doc for function %s\n", function->name);
+        linecount++; // Just to make things clear : I have absolutely no idea why I need to increment this but I know I need to. That's how it is.
         continue;
       }
     }
