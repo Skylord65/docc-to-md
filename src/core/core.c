@@ -323,8 +323,20 @@ int create_config(const char * src, const char * dst, const char * work, gen_con
     perror("realpath");
     return 1;
   }
+  if (mkdirp(dst) != 0) {
+    perror("mkdirp destination");
+    return 1;
+  }
   if (realpath(dst, configp->dest) == NULL) {
     perror("realpath");
+    return 1;
+  }
+  if (rmdirrf(configp->dest) != 0) {
+    perror("rm -rf dest");
+    return 1;
+  }
+  if (mkdirp(configp->dest) != 0) {
+    perror("mkdir -p confip->dest");
     return 1;
   }
   STRCP((char *)work, configp->work, PATH_MAX, 1);
