@@ -76,7 +76,7 @@ int main(int argc, char * argv[]) {
 
   struct callback_args_s callback_args = {
     .config = &config,
-    .source_code = &(struct source_code){},
+    .source_code = &(struct source_code){0},
     .results = (struct result){
       .success = 0,
       .fails = 0
