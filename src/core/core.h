@@ -96,6 +96,11 @@ struct enum_multiline_status_s {
   ulint members_count;
   struct enum_member * members;
   fnt_modifier modifiers;
+  char member_name_buffer[ENTITIES_NAME_LENGTH];
+  unsigned short int member_name_index;
+  unsigned short int value_buffer_index;
+  char found_equal;
+  char value_buffer[ENTITIES_NAME_LENGTH];
 };
 
 extern int normalize_type_string(const char * type, char * typebuf, int with_normalize_newline);

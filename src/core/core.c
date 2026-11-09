@@ -175,6 +175,7 @@ void recursion_callback(const char * src, callback_args params) {
     .reading_function_params = 0,
     .reading_multiline_macro = 0,
     .reading_multiline_struct = 0,
+    .reading_multiline_enum = 0,
     .line_count = 1,
     .data = NULL,
   };
@@ -196,11 +197,16 @@ void recursion_callback(const char * src, callback_args params) {
       try_extract_function_multiline(buffer, src, params, &status);
       goto last_bit;
     }
+    if (status.reading_multiline_enum) {
+      try_extract_enum_multiline(buffer, src, params, &status);
+      goto last_bit;
+    }
 
     if (!status.reading_multiline_struct || !status.reading_multiline_macro || !status.reading_function_params) {
       if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_struct(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_function(buffer, src, params, &status) == 0) goto last_bit;
+      if (try_extract_enum(buffer, src, params, &status) == 0) goto last_bit;
       if (status.is_header && try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
     }
 

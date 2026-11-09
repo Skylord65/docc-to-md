@@ -1,5 +1,6 @@
 #include "core.h"
 #include "../parsers/stringlib.h"
+#include "../parsers/parsers.h"
 #include "../macros.h"
 #include <linux/limits.h>
 #include <stdio.h>
@@ -1364,6 +1365,7 @@ static void register_enum(const char * path, callback_args args, struct status_s
 
   free(data);
   status->data = NULL;
+  status->reading_multiline_enum = 0;
   return;
 fail_with_free:
   if (enumerator->ref != NULL) free(enumerator->ref);
@@ -1381,13 +1383,222 @@ skip:
   return;
 }
 #undef GET_ECOUNT
+#define SKIP_VOID(p) while (*(p) == ' ') p++;
+#define SKIP_BOTH(p) {\
+  SKIP_WORD(p)\
+  SKIP_VOID(p);\
+}
+
+static int register_enum_member(struct enum_multiline_status_s * data) {
+  if (data->members_count == 0) {
+    if ((data->members = malloc(sizeof(struct enum_member))) == NULL) {
+      perror("malloc struct enum_member");
+      return 1;
+    }
+  } else {
+    if ((data->members = realloc(data->members, sizeof(struct enum_member) * (data->members_count + 1))) == NULL) {
+      perror("realloc struct enum_member");
+      return 1;
+    }
+  }
+
+  data->value_buffer[data->value_buffer_index] = 0;
+  if (data->found_equal == 1) data->members[data->members_count].value = parse_llint(data->value_buffer, NULL);
+  else data->members[data->members_count].value = data->members_count == 0 ? 0 : data->members[data->members_count - 1].value + 1;
+
+  data->member_name_buffer[data->member_name_index] = 0;
+  STRCP(data->member_name_buffer, data->members[data->members_count].name, ENTITIES_NAME_LENGTH, 1);
+
+  data->members_count++;
+  data->found_equal = 0;
+  data->member_name_index = 0;
+  data->value_buffer_index = 0;
+  return 0;
+}
 int try_extract_enum(char * buffer, const char * path, callback_args args, struct status_s * status) {
   while (*buffer == ' ') buffer++;
   if (*buffer == '#') return 1;
+  if (starts_with(buffer, "typedef")) return 0; // TODO remove this when the typedef parsing is operational
+
+  struct enum_multiline_status_s * data;
+  if ((data = malloc(sizeof(struct enum_multiline_status_s))) == NULL) {
+    perror("malloc enum_multiline_status_s");
+    args->results.fails++;
+    return 1;
+  }
+  data->modifiers = 0;
+  data->members = NULL;
+  data->starts_on_line = status->line_count;
+  data->members_count = 0;
+  data->member_name_index = 0;
+  data->value_buffer_index = 0;
+  data->found_equal = 0;
+  data->name[0] = 0;
+  data->value_buffer[0] = 0;
+  data->member_name_buffer[0] = 0;
+
+  char * turtle;
+  char * start = buffer;
+  if (starts_with(buffer, "enum")) {
+    SKIP_BOTH(buffer);
+    goto did_checks;
+  }
+  while (*buffer != 0 && *buffer != '\n') {
+    if (starts_with(buffer, "extern")) {
+      data->modifiers |= F_MEXTERN;
+      SKIP_BOTH(buffer);
+      continue;
+    }
+    if (starts_with(buffer, "volatile")) {
+      data->modifiers |= F_MVOLATI;
+      SKIP_BOTH(buffer);
+      continue;
+    }
+    if (starts_with(buffer, "static")) {
+      data->modifiers |= F_MSTATIC;
+      SKIP_BOTH(buffer);
+      continue;
+    }
+    buffer++;
+  }
+  buffer = start; // Restore from beginning, then, we will position ourself at the correct spot
+  if (F_ISTATIC(data->modifiers)) SKIP_BOTH(buffer);
+  if (F_IVOLATI(data->modifiers)) SKIP_BOTH(buffer);
+  if (F_IEXTERN(data->modifiers)) SKIP_BOTH(buffer);
+
+  if (!starts_with(buffer, "enum")) { // This is just not an enum man
+    free(data);
+    return 1;
+  }
+  SKIP_BOTH(buffer);
+did_checks: // From there, buffer is expected to be positionned at the beginning of the said name (it might not be the name, but that's where it is supposed to be)
+  turtle = buffer;
+  while (*turtle != ' ') turtle++;
+  if (turtle == buffer) {
+    fprintf(stderr, "    /!\\ Invalid enum construction at %s:%lld\n", path, status->line_count);
+    free(data);
+    return 1;
+  }
+  *turtle = 0;
+  STRCP(buffer, data->name, ENTITIES_NAME_LENGTH, 1);
+  *turtle = ' ';
+
+  // Now go through, we expect either '{' or ';'
+  SKIP_VOID(turtle);
+  if (*turtle != '{' && *turtle != ';') { // We could have a scenario like enum Thing
+                                          // { ... but if it's really a problem I will receive an issue
+    free(data);
+    return 1;
+  }
+  if (*turtle == ';') { // Simple declaration of enumerator, telling the compiler that it exists
+    status->data = data;
+    register_enum(path, args, status);
+    return 1;
+  }
+
+  turtle++;
+  while (*turtle != 0 && *turtle != '\n') {
+    if (*turtle == '}') {
+      if (data->member_name_index != 0) {
+        if (register_enum_member(data) != 0) {
+          if (data->members_count > 0) free(data->members);
+          free(data);
+          return 1;
+        }
+      }
+      status->data = data;
+      register_enum(path, args, status);
+      return 1;
+    }
+    if (*turtle == ',') {
+      if (data->member_name_index == 0) {
+        fprintf(stderr, "    /!\\ Malformed enum members at %s:%lld\n", path, status->line_count);
+        if (data->members_count > 0) free(data->members);
+        free(data);
+        return 0;
+      }
+
+      register_enum_member(data);
+      turtle++;
+      continue;
+    }
+    if (*turtle == ' ') {
+      turtle++;
+      continue;
+    }
+    if (*turtle == '=') {
+      if (data->found_equal == 1) {
+        fprintf(stderr, "    /!\\ Malformed enum member at %s:%lld\n", path, status->line_count);
+        if (data->members_count > 0) free(data->members);
+        free(data);
+        return 0;
+      }
+      data->found_equal = 1;
+      turtle++;
+      continue;
+    }
+    if (data->found_equal) data->value_buffer[data->value_buffer_index++] = *turtle;
+    else data->member_name_buffer[data->member_name_index++] = *turtle;
+    turtle++;
+  }
+  // If we are here, we didn't trigger anything, so we should continue to search
+  status->reading_multiline_enum = 1;
+  status->data = data;
 
   return 0;
 }
 
+int try_extract_enum_multiline(char *buffer, const char *path, callback_args args, struct status_s * status) {
+  struct enum_multiline_status_s * data = status->data;
+
+  while (*buffer != 0 && *buffer != '\n') {
+    if (*buffer == '}') {
+      if (data->member_name_index != 0) {
+        if (register_enum_member(data) != 0) {
+          if (data->members_count > 0) free(data->members);
+          free(data);
+          return 1;
+        }
+      }
+      status->data = data;
+      register_enum(path, args, status);
+      return 1;
+    }
+    if (*buffer == ',') {
+      if (data->member_name_index == 0) {
+        fprintf(stderr, "    /!\\ Malformed enum members at %s:%lld\n", path, status->line_count);
+        if (data->members_count > 0) free(data->members);
+        free(data);
+        return 0;
+      }
+
+      register_enum_member(data);
+      buffer++;
+      continue;
+    }
+    if (*buffer == ' ') {
+      buffer++;
+      continue;
+    }
+    if (*buffer == '=') {
+      if (data->found_equal == 1) {
+        fprintf(stderr, "    /!\\ Malformed enum member at %s:%lld\n", path, status->line_count);
+        if (data->members_count > 0) free(data->members);
+        free(data);
+        return 0;
+      }
+      data->found_equal = 1;
+      buffer++;
+      continue;
+    }
+    if (data->found_equal) data->value_buffer[data->value_buffer_index++] = *buffer;
+    else data->member_name_buffer[data->member_name_index++] = *buffer;
+    buffer++;
+  }
+  // Same, if we are here that means we triggered nothing, so continue searching
+  return 0;
+}
 
 #undef SKIP_WORD
+#undef SKIP_BOTH
 #undef FREE_DATA

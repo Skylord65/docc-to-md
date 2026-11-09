@@ -190,9 +190,11 @@ static void dump_enum(ARGS_T, struct enum_spec * enumerator) {
   DUMP("/Enumerator %s\nDefined in %s:%lu\nenum {", enumerator->name, enumerator->ref->filename, enumerator->ref->line);
   ulint j = 0;
   while (j < enumerator->members->count) {
-    DUMP("  %s = %lld%c", enumerator->members->array[j].name, enumerator->members->array[j].value, j == enumerator->members->count - 1 ? 0 : ',');
+    if (j == enumerator->members->count - 1) DUMP("  %s = %lld", enumerator->members->array[j].name, enumerator->members->array[j].value)
+    else DUMP("  %s = %lld%c", enumerator->members->array[j].name, enumerator->members->array[j].value, ',');
     j++;
   }
+  DUMP("}");
   DUMP("Modifiers : ");
   if (F_INONE(enumerator->modifiers)) DUMP("  [NONE]")
   else {
