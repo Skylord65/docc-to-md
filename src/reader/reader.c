@@ -186,6 +186,29 @@ static void dump_functions(ARGS_T, struct function_indic * functions) {
     i++;
   }
 }
+static void dump_enum(ARGS_T, struct enum_spec * enumerator) {
+  DUMP("/Enumerator %s\nDefined in %s:%lu\nenum {", enumerator->name, enumerator->ref->filename, enumerator->ref->line);
+  ulint j = 0;
+  while (j < enumerator->members->count) {
+    DUMP("  %s = %lld%c", enumerator->members->array[j].name, enumerator->members->array[j].value, j == enumerator->members->count - 1 ? 0 : ',');
+    j++;
+  }
+  DUMP("Modifiers : ");
+  if (F_INONE(enumerator->modifiers)) DUMP("  [NONE]")
+  else {
+    if (F_ISTATIC(enumerator->modifiers)) DUMP("   - static");
+    if (F_IEXTERN(enumerator->modifiers)) DUMP("   - extern");
+    if (F_IVOLATI(enumerator->modifiers)) DUMP("   - volatile");
+  }
+  DUMP(" ");
+}
+static void dump_enums(ARGS_T, struct enum_indic * enums) {
+  ulint i = 0;
+  while (i < enums->count) {
+    dump_enum(ARGS_V, enums->array + i);
+    i++;
+  }
+}
 int dump_source_code(const source_code_t code, int fd) {
   char buffer[BUFSIZ];
 
@@ -202,6 +225,9 @@ int dump_source_code(const source_code_t code, int fd) {
   DUMP("//// Functions");
   dump_functions(ARGS_V, &(code->definitions.functions));
 
+  DUMP("//// Enums");
+  dump_enums(ARGS_V, &(code->definitions.enums));
+
 
   DUMP("\n\n// Core code //");
   DUMP("//// Macros");
@@ -212,6 +238,9 @@ int dump_source_code(const source_code_t code, int fd) {
 
   DUMP("//// Functions");
   dump_functions(ARGS_V, &(code->implementations.functions));
+
+  DUMP("//// Enums");
+  dump_enums(ARGS_V, &(code->implementations.enums));
 
   return 0;
 }
