@@ -55,6 +55,20 @@ struct struct_spec {
   char name[ENTITIES_NAME_LENGTH];
   struct struct_members * members;
 };
+struct enum_member {
+  char name[ENTITIES_NAME_LENGTH];
+  long long int value;
+};
+struct enum_members {
+  ulint count;
+  struct enum_member * array;
+};
+struct enum_spec {
+  char name[ENTITIES_NAME_LENGTH];
+  struct enum_members * members;
+  reference_t ref;
+  fnt_modifier modifiers;
+};
 struct typedef_spec {
   reference_t ref;
   char name[ENTITIES_NAME_LENGTH];
@@ -114,6 +128,10 @@ struct typedef_indic {
   ulint count;
   struct typedef_spec * array;
 };
+struct enum_indic {
+  ulint count;
+  struct enum_spec * array;
+};
 
 struct source_code_defs {
   struct function_indic  functions;
@@ -121,12 +139,14 @@ struct source_code_defs {
   struct struct_indic    structs;
   struct typedef_indic   typedefs;
   struct variables_indic variables;
+  struct enum_indic      enums;
 };
 struct source_code_impls {
   struct function_indic  functions;
   struct macro_indic     macros;
   struct struct_indic    structs;
   struct typedef_indic   typedefs;
+  struct enum_indic      enums;
 };
 
 struct source_code {

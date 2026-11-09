@@ -1301,6 +1301,93 @@ fail:
   status->reading_function_params = 0;
   return 0;
 }
+#define GET_ECOUNT(header, code) ((header) ? (code->definitions.enums.count) : (code->implementations.enums.count))
+#define FREE_ENUMDATA(status, data) {\
+  if (data->members_count > 0 && data->members != NULL) free(data->members);\
+  free(data);\
+  status->data = NULL;\
+}
+static void register_enum(const char * path, callback_args args, struct status_s * status) {
+  struct enum_multiline_status_s * data = status->data;
+
+  struct enum_spec * enumerator = NULL;
+  if (status->is_header) {
+    if (args->source_code->definitions.enums.count == 0) {
+      if ((args->source_code->definitions.enums.array = malloc(sizeof(struct enum_spec))) == NULL) {
+        perror("malloc struct enum_spec");
+        goto fail;
+      }
+    } else {
+      if ((args->source_code->definitions.enums.array = realloc(args->source_code->definitions.enums.array, sizeof(struct enum_spec) * (args->source_code->definitions.enums.count + 1))) == NULL) {
+        perror("realloc struct enum_spec");
+        goto fail;
+      }
+    }
+
+    enumerator = args->source_code->definitions.enums.array + args->source_code->definitions.enums.count;
+    args->source_code->definitions.enums.count++;
+  } else {
+    if (args->source_code->implementations.enums.count == 0) {
+      if ((args->source_code->implementations.enums.array = malloc(sizeof(struct enum_spec))) == NULL) {
+        perror("malloc struct enum_spec");
+        goto fail;
+      }
+    } else {
+      if ((args->source_code->implementations.enums.array = realloc(args->source_code->implementations.enums.array, sizeof(struct enum_spec) * (args->source_code->implementations.enums.count + 1))) == NULL) {
+        perror("realloc struct enum_spec");
+        goto fail;
+      }
+    }
+
+    enumerator = args->source_code->implementations.enums.array + args->source_code->implementations.enums.count;
+    args->source_code->implementations.enums.count++;
+  }
+
+  enumerator->ref = NULL;
+  enumerator->members = NULL;
+  if ((enumerator->ref = malloc(sizeof(struct reference))) == NULL) {
+    perror("malloc enumerator->ref");
+    goto fail_with_free;
+  }
+  if ((enumerator->members = malloc(sizeof(struct enum_members))) == NULL) {
+    perror("malloc enumerator->members");
+    goto fail_with_free;
+  }
+  enumerator->modifiers = data->modifiers;
+  enumerator->members->count = data->members_count;
+  enumerator->members->array = data->members; // Since these are already malloced, we can just pass the pointer. Just don't free it afterwards
+  enumerator->ref->line = data->starts_on_line;
+  STRCP(data->name, enumerator->name, ENTITIES_NAME_LENGTH, 1);
+  STRCP((char *)path, enumerator->ref->filename, PATH_MAX, 1);
+
+  if (args->config->verbose_registration) printf("- Registering enumerator %s (%lu members)\n", enumerator->name, enumerator->members->count);
+
+  free(data);
+  status->data = NULL;
+  return;
+fail_with_free:
+  if (enumerator->ref != NULL) free(enumerator->ref);
+  if (enumerator->members != NULL) free(enumerator->members);
+  if (GET_ECOUNT(status->is_header, args->source_code) == 1) status->is_header ? free(args->source_code->definitions.enums.array) : free(args->source_code->implementations.enums.array);
+  if (status->is_header) args->source_code->definitions.enums.count--;
+  else args->source_code->implementations.enums.count--;
+  goto fail;
+fail:
+  args->results.fails++;
+  goto skip;
+skip:
+  FREE_ENUMDATA(status, data);
+  status->reading_multiline_enum = 0;
+  return;
+}
+#undef GET_ECOUNT
+int try_extract_enum(char * buffer, const char * path, callback_args args, struct status_s * status) {
+  while (*buffer == ' ') buffer++;
+  if (*buffer == '#') return 1;
+
+  return 0;
+}
+
 
 #undef SKIP_WORD
 #undef FREE_DATA
