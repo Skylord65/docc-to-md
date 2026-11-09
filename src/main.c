@@ -90,6 +90,7 @@ int main(int argc, char * argv[]) {
   }
   recursion(config.work, &callback_args, recursion_callback);
   if (args[8].found) recursion(config.src, &callback_args, register_doccumments_callback);
+  if (args[7].found) summarise_parsing(callback_args.source_code);
 
   dump(callback_args.source_code, args[5], args[6]);
 

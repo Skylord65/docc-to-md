@@ -198,6 +198,45 @@ int dump_source_code(const source_code_t code, int fd) {
   return 0;
 }
 
+void summarise_parsing(source_code_t code) {
+  ulint header_var_macro = 0;
+  ulint source_var_macro = 0;
+  ulint header_fnt_macro = 0;
+  ulint source_fnt_macro = 0;
+  ulint i = 0;
+  while (i < code->definitions.macros.count) {
+    if (code->definitions.macros.array[i].is_function) header_fnt_macro++;
+    else header_var_macro++;
+    i++;
+  }
+  i = 0;
+  while (i < code->implementations.macros.count) {
+    if (code->implementations.macros.array[i].is_function) source_fnt_macro++;
+    else source_var_macro++;
+    i++;
+  }
+
+  printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :\
+\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)\n",
+    code->definitions.variables.count,
+    code->definitions.functions.count + code->implementations.functions.count,
+    code->definitions.functions.count,
+    code->implementations.functions.count,
+    code->definitions.macros.count + code->implementations.macros.count,
+    code->definitions.macros.count,
+    code->implementations.macros.count,
+    header_fnt_macro + source_fnt_macro,
+    header_fnt_macro,
+    source_fnt_macro,
+    header_var_macro + source_var_macro,
+    header_var_macro,
+    source_var_macro,
+    code->definitions.structs.count + code->implementations.structs.count,
+    code->definitions.structs.count,
+    code->implementations.structs.count
+  );
+}
+
 #undef ARGS_T
 #undef ARGS_V
 #undef DUMP

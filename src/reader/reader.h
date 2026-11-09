@@ -138,5 +138,6 @@ typedef struct source_code * source_code_t;
 
 void free_source_code(source_code_t);
 int dump_source_code(const source_code_t, int fd);
+void summarise_parsing(source_code_t);
 
 #endif
