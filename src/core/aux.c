@@ -306,7 +306,7 @@ static int register_macro(const char * path, callback_args params, struct status
   if ((macro->ref = malloc(sizeof(struct reference))) == NULL) {
     perror("malloc macro_spec->ref");
     if (data->is_function) free(args);
-    if (GET_MCOUNT(status->is_header, params->source_code)) free(macro);
+    if (GET_MCOUNT(status->is_header, params->source_code) == 1) free(macro);
     status->data = NULL;
     return 1;
   }
@@ -603,14 +603,14 @@ static int register_structure(const char * filename, callback_args params, struc
   }
   if ((structure->ref = malloc(sizeof(struct reference))) == NULL) {
     perror("malloc struct_spec->ref");
-    if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+    if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
     params->results.fails++;
     return 0;
   }
   if ((structure->members = malloc(sizeof(struct struct_members))) == NULL) {
     perror("malloc struct_spec->members");
     free(structure->ref);
-    if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+    if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
     params->results.fails++;
     return 0;
   }
@@ -620,7 +620,7 @@ static int register_structure(const char * filename, callback_args params, struc
       perror("malloc struct_spec->members->array");
       free(structure->members);
       free(structure->ref);
-      if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+      if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
       params->results.fails++;
       return 0;
     }
@@ -641,7 +641,7 @@ static int register_structure(const char * filename, callback_args params, struc
         free(structure->members->array);
         free(structure->members);
         free(structure->ref);
-        if (GET_COUNT(status->is_header, params->source_code) == 0) free(structure);
+        if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
         if (free_type && typebuf != NULL) free(typebuf);
         return 0;
       }
@@ -899,14 +899,14 @@ static void register_function(const char * path, callback_args params, struct st
   }
   if ((function->ref = malloc(sizeof(struct reference))) == NULL) {
     perror("malloc function->ref");
-    if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+    if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
     FREE_DATA(status, data);
     return;
   }
   if ((function->args = malloc(sizeof(struct function_args))) == NULL) {
     perror("malloc function->args");
     free(function->ref);
-    if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+    if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
     FREE_DATA(status, data);
     return;
   }
@@ -924,7 +924,7 @@ static void register_function(const char * path, callback_args params, struct st
       params->results.fails++;
       free(function->ref);
       free(function->args);
-      if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+      if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
       FREE_DATA(status, data);
       return;
     }
@@ -940,8 +940,10 @@ almost_complete_fail:
         free(function->ref);
         free(function->args->array);
         free(function->args);
-        if (GET_FCOUNT(status->is_header, params->source_code) == 0) free(function);
+        if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
         FREE_DATA(status, data);
+        if (status->is_header) params->source_code->definitions.functions.count--;
+        else params->source_code->implementations.functions.count--;
         return;
       }
 
@@ -1177,6 +1179,12 @@ resume:
 
   if (data->name[0] == 0 || data->returntype.string[0] == 0) { // This was not a function after all
     goto cleanup_fail;
+  }
+  // Quick check on name : if it includes something like a dot it's not a function
+  ulint check_index = 0;
+  while (data->name[check_index] != 0 && check_index < ENTITIES_NAME_LENGTH) {
+    if (data->name[check_index] == '.') goto cleanup_fail;
+    check_index++;
   }
   if (*buffer != 0 && !data->reading_args) {
     while (*buffer != '{' && *buffer != ';' && *buffer != 0) buffer++;
