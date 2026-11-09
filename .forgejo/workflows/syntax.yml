@@ -1,0 +1,26 @@
+name: Check Project syntax health
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    runs-on: arch
+    steps:
+      - name: Checkout repository
+        uses: actions/actions@checkout@v4
+
+      - name: Modify makefile
+        run: |
+          set -euo pipefail
+
+          sed -i 's/\(FLAGS=.*\)/\1 -Werror/' makefile
+          sed -i 's/\(CLEANBUILD_FLAGS=.*\)/\1 -Werror/' makefile
+
+      - name: Compile and see
+        run: |
+          make
+          make clean
+          make cleanbuild
