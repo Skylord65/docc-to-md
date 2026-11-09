@@ -18,9 +18,12 @@ jobs:
 
           sed -i 's/\(FLAGS=.*\)/\1 -Werror/' makefile
           sed -i 's/\(CLEANBUILD_FLAGS=.*\)/\1 -Werror/' makefile
+          sed -i 's/ ?-DNODEBUG//' makefile
+
+          cat makefile
 
       - name: Compile and see
         run: |
-          make
+          make DEBUG=1
           make clean
-          make cleanbuild
+          make cleanbuild DEBUG=1
