@@ -29,6 +29,26 @@ makepkg -siCcf
 
 When it will be finished, it will be released, it will be available on my [forgejo packages repository page](https://git.greensky.tf/Greensky/-/packages), auto compiled and published by the [PKGBUILDING](https://git.greensky.tf/Greensky/PKGBUILDING) repository
 
+## Roadmap
+
+This is essentially a list of things to do, so I don't forget
+
+| What | Importance | Notes | Status |
+|:----:|:----------:|:-----:|:------:|
+| Macros parsing | High | `N/A` | ✅ |
+| Structures parsing | Necessary | `N/A` | ✅ |
+| Functions parsing | Necessary | `N/A` | ✅ |
+| Typedef parsing | Necessary | `N/A` | 🏗️ |
+| Unamed functions arguments resolving | Low | Finish the resolving of unamed function arguments. This is mainly for arguments that are custom structs/enums/typedefs or standard types that don't fit in one word | 🚧 |
+| Types resolving | Necessary | Needs the typedef parsing to be done | 🚧 |
+| Markdown writing | Necessary | Needs types resolved | 🚧 |
+
+> Legend :
+> 🚧 : Planned
+> 🏗️ : Working on it
+> ❌ : Aborted
+> ✅ : Done
+
 ## Contact
 
 Since the code makes a lot of assumptions and purposely ignores some valid C cases, like :
