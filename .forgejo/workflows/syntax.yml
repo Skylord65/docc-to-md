@@ -10,7 +10,7 @@ jobs:
     runs-on: arch
     steps:
       - name: Checkout repository
-        uses: actions/actions@checkout@v4
+        uses: actions/checkout@v4
 
       - name: Modify makefile
         run: |
