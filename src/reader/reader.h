@@ -75,6 +75,7 @@ struct function_spec {
   reference_t ref;
 
   struct function_args * args;
+  char * description;
 };
 struct macro_args {
   ulint count;

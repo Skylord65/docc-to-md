@@ -385,6 +385,133 @@ int mkdirp(const char * path) {
   return 0;
 }
 
+void register_doccumments_callback(const char * src, callback_args params) {
+  FILE * stream;
+  if ((stream = fopen(src, "rb")) == NULL) {
+    perror("fopen");
+    params->results.fails++;
+    return;
+  }
+  char buffer[LINE_BUFFER_SIZE];
+  int is_headerfile = is_header(src);
+  int in_string = 0;
+  int in_char = 0;
+
+  int in_multiline_comment = 0;
+  long multiline_start = 0;
+  unsigned long linecount = 0;
+
+  errno = 0;
+  while ((fgets(buffer, LINE_BUFFER_SIZE, stream)) != NULL) {
+    linecount++;
+    char * ptr = buffer;
+    while (*ptr == ' ') ptr++;
+
+    if (!in_multiline_comment) {
+      if (IS_STRING_DEL(buffer, ptr) && !in_char) in_string = !in_string;
+      else if (IS_CHAR_DEL(buffer, ptr) && !in_string) in_char = !in_char;
+      else {
+        if (*ptr == '/' && *(ptr + 1) == '*') {
+          in_multiline_comment = 1;
+          multiline_start = ftell(stream) - strlen(buffer);
+          continue;
+        }
+      }
+    } else {
+      if (*ptr != '*') { // This is not a doccomment, abort mission
+        in_multiline_comment = 0;
+        continue;
+      }
+      if (*(ptr + 1) == '/') {
+        in_multiline_comment = 0;
+        // Now look if there is any function that is registered here or 
+        struct function_indic * indicator = is_headerfile ? &(params->source_code->definitions.functions) : &(params->source_code->implementations.functions);
+        struct function_spec * function = NULL;
+        ulint i = 0;
+        while (i < indicator->count) {
+          if (indicator->array[i].ref->line == linecount || indicator->array[i].ref->line == linecount + 1) {// We do have a function (on this line or on another one), mark it, and proceed
+            function = indicator->array + i;
+            break;
+          }
+          i++;
+        }
+
+        if (function == NULL) continue;
+        long jump_back = ftell(stream);
+
+        fseek(stream, multiline_start, SEEK_SET);
+        unsigned long int description_index = 0;
+        size_t description_size = 1024;
+
+        if ((function->description = malloc(description_size)) == NULL) {
+          perror("malloc function->description");
+          params->results.fails++;
+          fclose(stream);
+          return;
+        }
+
+        errno = 0;
+        while (fgets(buffer, LINE_BUFFER_SIZE, stream) != NULL && multiline_start < jump_back) {
+          char * bufptr = buffer;
+          int started = 0;
+          while (*bufptr != 0) {
+            if (description_index == description_size - 1) {
+              if ((function->description = realloc(function->description, description_size * 2)) == NULL) {
+                perror("realloc function->description");
+                params->results.fails++;
+                free(function->description);
+                return;
+              }
+            }
+            if (!started) {
+              if (*bufptr != ' ' && *bufptr != '*' && *bufptr != '/') {
+                started = 1;
+                function->description[description_index] = *bufptr;
+                description_index++;
+              }
+            } else {
+              if (*(bufptr - 1) != '*' || *bufptr != '/') {
+                function->description[description_index] = *bufptr;
+                description_index++;
+              }
+            }
+            multiline_start++;
+            bufptr++;
+          }
+        }
+        if (errno != 0) {
+          perror("fgets description");
+          free(function->description);
+        }
+        if (description_index > 0 && function->description[description_index - 1] == '\n') function->description[description_index] = 0;
+        else function->description[description_index] = 0;
+
+        // Health check on the description : if we have only spaces and newlines, we can remove it
+        description_index = 0;
+        int healthy = 0;
+        while (function->description[description_index] != 0 && !healthy) {
+          if (function->description[description_index] != ' ' && function->description[description_index] != '\n') healthy = 1;
+          description_index++;
+        }
+        if (!healthy) {
+          free(function->description);
+          function->description = NULL;
+        }
+        if (params->config->verbose_registration) printf("- Registering comment doc for function %s\n", function->name);
+        continue;
+      }
+    }
+  }
+  if (errno != 0) {
+    perror("fgets");
+    params->results.fails++;
+    fclose(stream);
+    return;
+  }
+
+  fclose(stream);
+}
+
 void cleanup(gen_config_t config) {
-  rmdir(config->work);
+  rmdirrf(config->work);
 }

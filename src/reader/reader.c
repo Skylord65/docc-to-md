@@ -1,5 +1,4 @@
 #include "reader.h"
-#include "../debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,6 +57,7 @@ static void free_variables(struct variables_indic * variables) {
 }
 static void free_function(struct function_spec * function) {
   if (function->args->count > 0 && function->args->array != NULL) free(function->args->array);
+  if (function->description != NULL) free(function->description);
   free(function->args);
   free(function->ref);
 }
@@ -139,6 +139,7 @@ static void dump_structures(ARGS_T, struct struct_indic * structures) {
 }
 static void dump_function(ARGS_T, struct function_spec * function) {
   DUMP("Defined in %s:%lu\n  NAME: %s\n  Modifiers :", function->ref->filename, function->ref->line, function->name);
+  if (function->description != NULL) DUMP("--------\n%s\n--------", function->description)
 
   if (F_INONE(function->modifiers)) DUMP("    - [NONE]")
   else {

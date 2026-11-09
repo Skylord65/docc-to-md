@@ -6,6 +6,9 @@
 #include <linux/limits.h>
 #include <unistd.h>
 
+#define IS_STRING_DEL(origin, cptr) (*(cptr) == '"' && (cptr == origin || *(cptr - 1) != '\\'))
+#define IS_CHAR_DEL(origin, cptr) (*(cptr) == '\'' && (cptr == origin || *(cptr - 1) != '\\'))
+
 typedef enum {
   Ok = 0,
   UnknownPath = 1,
@@ -35,6 +38,7 @@ typedef void recursion_callback_t(const char * src, callback_args params);
 extern recursion_return_t recursion(const char * src, callback_args params, recursion_callback_t callback);
 extern void recursion_callback(const char * src, callback_args params);
 extern void remove_comments_callback(const char * src, callback_args params);
+extern void register_doccumments_callback(const char * src, callback_args params);
 
 extern int create_config(const char * src, const char * dst, const char * work, gen_config_t);
 extern int mkdirp(const char * path);

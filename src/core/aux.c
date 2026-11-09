@@ -1,14 +1,10 @@
 #include "core.h"
 #include "../parsers/stringlib.h"
 #include "../macros.h"
-#include "../debug.h"
 #include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define IS_STRING_DEL(origin, cptr) (*(cptr) == '"' && (cptr == origin || *(cptr - 1) != '\\'))
-#define IS_CHAR_DEL(origin, cptr) (*(cptr) == '\'' && (cptr == origin || *(cptr - 1) != '\\'))
 
 /*
  * This function will temporarely modify its input, but will leave it as original
@@ -1003,6 +999,7 @@ if_exit:
   function->modifiers = data->modifiers;
   function->returntype.type = data->returntype.type;
   function->returntype.ptr = NULL;
+  function->description = NULL;
 
   FREE_DATA(status, data);
 

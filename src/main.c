@@ -48,7 +48,8 @@ int main(int argc, char * argv[]) {
     { "--help", "Displays help and exits", Presence, 0, 0, NULL },
     { "-d", "Dump parsed source code to a file. Needs --dump to specify file name", Presence, 0, 0, NULL },
     { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL },
-    { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL }
+    { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL },
+    { "--enable-commentdoc", "Enable the registration of doc comments for functions", Presence, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -88,6 +89,7 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   recursion(config.work, &callback_args, recursion_callback);
+  if (args[8].found) recursion(config.src, &callback_args, register_doccumments_callback);
 
   dump(callback_args.source_code, args[5], args[6]);
 
