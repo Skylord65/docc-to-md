@@ -71,8 +71,10 @@ struct enum_spec {
 };
 struct typedef_spec {
   reference_t ref;
+  char * buffer;
   char name[ENTITIES_NAME_LENGTH];
   entity_type_t * definition;
+  fnt_modifier modifiers;
 };
 struct function_arg {
   char name[ENTITIES_NAME_LENGTH];

@@ -177,6 +177,7 @@ void recursion_callback(const char * src, callback_args params) {
     .reading_multiline_macro = 0,
     .reading_multiline_struct = 0,
     .reading_multiline_enum = 0,
+    .reading_multiline_typedef = 0,
     .line_count = 1,
     .data = NULL,
   };
@@ -185,28 +186,16 @@ void recursion_callback(const char * src, callback_args params) {
   errno = 0;
   while (fgets(buffer, LINE_BUFFER_SIZE, stream) != NULL) {
     if (is_line_empty(buffer)) goto last_bit;
-
-    if (status.reading_multiline_macro) {
-      try_extract_macro_multiline(buffer, src, params, &status);
-      goto last_bit;
-    }
-    if (status.reading_multiline_struct) {
-      try_extract_struct_multiline(buffer, src, params, &status);
-      goto last_bit;
-    }
-    if (status.reading_function_params) {
-      try_extract_function_multiline(buffer, src, params, &status);
-      goto last_bit;
-    }
-    if (status.reading_multiline_enum) {
-      try_extract_enum_multiline(buffer, src, params, &status);
-      goto last_bit;
-    }
-
-    if (!status.reading_multiline_struct || !status.reading_multiline_macro || !status.reading_function_params) {
+    else if (status.reading_multiline_macro) try_extract_macro_multiline(buffer, src, params, &status);
+    else if (status.reading_multiline_struct) try_extract_struct_multiline(buffer, src, params, &status);
+    else if (status.reading_function_params) try_extract_function_multiline(buffer, src, params, &status);
+    else if (status.reading_multiline_enum) try_extract_enum_multiline(buffer, src, params, &status);
+    else if (status.reading_multiline_typedef) try_extract_typedef_multiline(buffer, src, params, &status);
+    else {
       if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_struct(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_function(buffer, src, params, &status) == 0) goto last_bit;
+      if (try_extract_typedef(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_enum(buffer, src, params, &status) == 0) goto last_bit;
       if (status.is_header && try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
     }

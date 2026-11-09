@@ -1,5 +1,4 @@
 #include "core.h"
-#include "../debug.h"
 #include "../parsers/stringlib.h"
 #include "../parsers/parsers.h"
 #include "../macros.h"
@@ -1388,6 +1387,7 @@ skip:
   return;
 }
 #undef GET_ECOUNT
+#undef FREE_ENUMDATA
 #define SKIP_VOID(p) while (*(p) == ' ') p++;
 #define SKIP_BOTH(p) {\
   SKIP_WORD(p)\
@@ -1423,7 +1423,6 @@ static int register_enum_member(struct enum_multiline_status_s * data) {
 int try_extract_enum(char * buffer, const char * path, callback_args args, struct status_s * status) {
   while (*buffer == ' ') buffer++;
   if (*buffer == '#') return 1;
-  if (starts_with(buffer, "typedef")) return 0; // TODO remove this when the typedef parsing is operational
 
   struct enum_multiline_status_s * data;
   if ((data = malloc(sizeof(struct enum_multiline_status_s))) == NULL) {
@@ -1603,7 +1602,182 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
   // Same, if we are here that means we triggered nothing, so continue searching
   return 0;
 }
+#undef FREE_DATA
+
+#define GET_TCOUNT(header, code) (header ? (code->definitions.typedefs.count) : (code->implementations.typedefs.count))
+#define FREE_ALL(data, status, td) {\
+  if (data->buffer != NULL) free(data->buffer);\
+  if (td != NULL && td->ref != NULL) free(td->ref);\
+  if (td != NULL && td->definition != NULL) free(td->definition);\
+  free(data);\
+  status->data = NULL;\
+  status->reading_multiline_typedef = 0;\
+}
+#define FREE_IF_NEEDED(status, args, td) {\
+  if (status->is_header) args->source_code->definitions.typedefs.count--;\
+  else args->source_code->implementations.typedefs.count--;\
+  if (GET_TCOUNT(status->is_header, args->source_code) == 1) free(td);\
+}
+
+static char * obtain_last_word_from_end(char * end) {
+  while (*end != ' ') end--;
+  char * word = end + 1;
+
+  while (*end == ' ') end--;
+  *(end + 1) = 0;
+  *(word - 1) = 0;
+
+  return word;
+}
+static int register_typedef(const char * path, callback_args args, struct status_s * status) {
+  struct typedef_multiline_status_s * data = status->data;
+
+  struct typedef_spec * td = NULL;
+  if (status->is_header) {
+    if (args->source_code->definitions.typedefs.count == 0) {
+      if ((args->source_code->definitions.typedefs.array = malloc(sizeof(struct typedef_spec))) == NULL) {
+        perror("malloc typedefs array");
+        FREE_ALL(data, status, td);
+        return 1;
+      }
+    } else {
+      if ((args->source_code->definitions.typedefs.array = realloc(args->source_code->definitions.typedefs.array, sizeof(struct typedef_spec) * (args->source_code->definitions.typedefs.count + 1))) == NULL) {
+        perror("realloc typedef array");
+        FREE_ALL(data, status, td);
+        return 1;
+      }
+    }
+
+    td = args->source_code->definitions.typedefs.array + args->source_code->definitions.typedefs.count;
+    args->source_code->definitions.typedefs.count++;
+  } else {
+    if (args->source_code->implementations.typedefs.count == 0) {
+      if ((args->source_code->implementations.typedefs.array = malloc(sizeof(struct typedef_spec))) == NULL) {
+        perror("malloc typedefs array");
+        FREE_ALL(data, status, td);
+        args->results.fails++;
+        return 1;
+      }
+    } else {
+      if ((args->source_code->implementations.typedefs.array = realloc(args->source_code->implementations.typedefs.array, sizeof(struct typedef_spec) * (args->source_code->implementations.typedefs.count + 1))) == NULL) {
+        perror("realloc typedef array");
+        FREE_ALL(data, status, td);
+        args->results.fails++;
+        return 1;
+      }
+    }
+
+    td = args->source_code->implementations.typedefs.array + args->source_code->implementations.typedefs.count;
+    args->source_code->implementations.typedefs.count++;
+  }
+
+  if ((td->ref = malloc(sizeof(struct reference))) == NULL) {
+    perror("malloc typedef_spec->ref");
+    FREE_ALL(data, status, td);
+    FREE_IF_NEEDED(status, args, td);
+    args->results.fails++;
+    return 1;
+  }
+  td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
+  td->ref->line = data->starts_on_line;
+  td->modifiers = data->modifiers;
+  STRCP((char *)path, td->ref->filename, PATH_MAX, 1);
+
+  char * name = obtain_last_word_from_end(data->buffer + data->buffer_index);
+  STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
+  td->definition = NULL;
+
+  if (args->config->verbose_registration) printf("- Registering typedef %s\n", td->name);
+
+  free(data);
+  return 0;
+}
+#undef FREE_IF_NEEDED
+#undef FREE_ALL
+#undef GET_TCOUNT
+
+int try_extract_typedef(char * buffer, const char * path, callback_args params, struct status_s * status) {
+  SKIP_VOID(buffer);
+  if (*buffer == '#') return 1;
+
+  fnt_modifier modifs = 0;
+  if (starts_with(buffer, "volatile")) {
+    modifs |= F_MVOLATI;
+    SKIP_BOTH(buffer);
+  }
+
+  if (!starts_with(buffer, "typedef")) return 1;
+  struct typedef_multiline_status_s * data;
+  if ((data = malloc(sizeof(struct typedef_multiline_status_s))) == NULL) {
+    perror("malloc typedef data");
+    params->results.fails++;
+    return 1;
+  }
+  if ((data->buffer = malloc(sizeof(char) * 256)) == NULL) {
+    perror("malloc buffer");
+    params->results.fails++;
+    free(data);
+    return 1;
+  }
+  data->modifiers = modifs;
+  data->buffer_size = 256;
+  data->buffer_index = 0;
+  data->starts_on_line = status->line_count;
+
+  while (*buffer != 0 && *buffer != '\n') {
+    if (*buffer == ';') { // We found the end of the typedef
+      status->data = data;
+      data->buffer[data->buffer_index++] = 0;
+      return register_typedef(path, params, status);
+    }
+
+    if (*buffer != ' ' || data->buffer_index == 0 || data->buffer[data->buffer_index - 1] != ' ') { // Complex condition, but it is just to not copy 2 consecutive spaces
+      if (data->buffer_index == data->buffer_size - 2) { // Keep one for 0
+        data->buffer_size *= 2;
+        if ((data->buffer = realloc(data->buffer, data->buffer_size)) == NULL) {
+          perror("realloc typedef data->buffer");
+          free(data->buffer);
+          free(data);
+          params->results.fails++;
+          return 1;
+        }
+      }
+      data->buffer[data->buffer_index++] = *buffer;
+    }
+    buffer++;
+  }
+  // If we are here we didn't trigger the end, so just continue on the next lines
+  status->reading_multiline_typedef = 1;
+  status->data = data;
+  return 0;
+}
+int try_extract_typedef_multiline(char * buffer, const char * path, callback_args params, struct status_s * status) {
+  struct typedef_multiline_status_s * data = status->data;
+
+  while (*buffer != 0 && *buffer != '\n') {
+    if (*buffer == ';') { // We found the end of the typedef
+      data->buffer[data->buffer_index++] = 0;
+      status->reading_multiline_typedef = 0;
+      return register_typedef(path, params, status);
+    }
+
+    if (*buffer != ' ' || data->buffer_index == 0 || data->buffer[data->buffer_index - 1] == ' ') { // Complex condition, but it is just to not copy 2 consecutive spaces
+      if (data->buffer_index == data->buffer_size - 2) { // Keep one for 0
+        data->buffer_size *= 2;
+        if ((data->buffer = realloc(data->buffer, data->buffer_size)) == NULL) {
+          perror("realloc typedef data->buffer");
+          free(data->buffer);
+          free(data);
+          params->results.fails++;
+          return 1;
+        }
+      }
+      data->buffer[data->buffer_index++] = *buffer;
+    }
+    buffer++;
+  }
+  return 0;
+}
 
 #undef SKIP_WORD
 #undef SKIP_BOTH
-#undef FREE_DATA

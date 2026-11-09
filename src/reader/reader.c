@@ -85,6 +85,19 @@ static void free_enums(struct enum_indic * enumerators) {
     free(enumerators->array);
   }
 }
+static void free_typedef(struct typedef_spec * td) {
+  if (td->ref != NULL) free(td->ref);
+  if (td->definition != NULL) free(td->definition);
+  if (td->buffer != NULL) free(td->buffer);
+}
+static void free_typedefs(struct typedef_indic * tds) {
+  ulint i = 0;
+  while (i < tds->count) {
+    free_typedef(tds->array + i);
+    i++;
+  }
+  free(tds->array);
+}
 void free_source_code(source_code_t code) {
   free_variables(&(code->definitions.variables));
   free_macro_array(&(code->definitions.macros));
@@ -93,6 +106,8 @@ void free_source_code(source_code_t code) {
   free_functions(&(code->definitions.functions));
   free_enums(&(code->definitions.enums));
   free_enums(&(code->implementations.enums));
+  free_typedefs(&(code->definitions.typedefs));
+  free_typedefs(&(code->implementations.typedefs));
 
   free_structures_array(&(code->implementations.structs));
   free_structures_array(&(code->definitions.structs));
@@ -107,6 +122,7 @@ void free_source_code(source_code_t code) {
 }
 
 static void dump_macros(ARGS_T, struct macro_indic * macros) {
+  DUMP("////MACROS")
   ulint i = 0;
   while (i < macros->count) {
     struct macro_spec * macro = macros->array + i;
@@ -126,6 +142,7 @@ static void dump_macros(ARGS_T, struct macro_indic * macros) {
   }
 }
 static void dump_variables(ARGS_T, struct variables_indic * variables) {
+  DUMP("////VARIABLES")
   ulint i = 0;
   while (i < variables->count) {
     struct variable * variable = variables->array + i;
@@ -134,6 +151,7 @@ static void dump_variables(ARGS_T, struct variables_indic * variables) {
   }
 }
 static void dump_structures(ARGS_T, struct struct_indic * structures) {
+  DUMP("////STRUCTURES")
   ulint i = 0;
   while (i < structures->count) {
     struct struct_spec * structure = structures->array + i;
@@ -180,6 +198,7 @@ static void dump_function(ARGS_T, struct function_spec * function) {
   DUMP("  Returns : %s\n", function->returntype.string);
 }
 static void dump_functions(ARGS_T, struct function_indic * functions) {
+  DUMP("////FUNCTIONS")
   ulint i = 0;
   while (i < functions->count) {
     dump_function(buffer, fd, functions->array + i);
@@ -205,9 +224,21 @@ static void dump_enum(ARGS_T, struct enum_spec * enumerator) {
   DUMP(" ");
 }
 static void dump_enums(ARGS_T, struct enum_indic * enums) {
+  DUMP("////ENUMERATORS")
   ulint i = 0;
   while (i < enums->count) {
     dump_enum(ARGS_V, enums->array + i);
+    i++;
+  }
+}
+static void dump_typedef(ARGS_T, struct typedef_spec * spec) {
+  if (spec->buffer != NULL) DUMP("/Typedef %s\nDefined in %s:%lu\ntypedef %s %s\n", spec->name, spec->ref->filename, spec->ref->line, spec->buffer, spec->name);
+}
+static void dump_typedefs(ARGS_T, struct typedef_indic * indic) {
+  DUMP("////Typedefs")
+  ulint i = 0;
+  while (i < indic->count) {
+    dump_typedef(ARGS_V, indic->array + i);
     i++;
   }
 }
@@ -215,34 +246,19 @@ int dump_source_code(const source_code_t code, int fd) {
   char buffer[BUFSIZ];
 
   DUMP("// Headers //");
-  DUMP("//// Variables");
-  if (code->definitions.variables.count > 0) dump_variables(ARGS_V, &(code->definitions.variables));
-
-  DUMP("//// Macros");
-  if (code->definitions.macros.count > 0) dump_macros(ARGS_V, &(code->definitions.macros));
-
-  DUMP("//// Structures");
-  if (code->definitions.structs.count > 0) dump_structures(ARGS_V, &(code->definitions.structs));
-
-  DUMP("//// Functions");
+  dump_variables(ARGS_V, &(code->definitions.variables));
+  dump_macros(ARGS_V, &(code->definitions.macros));
+  dump_structures(ARGS_V, &(code->definitions.structs));
   dump_functions(ARGS_V, &(code->definitions.functions));
-
-  DUMP("//// Enums");
   dump_enums(ARGS_V, &(code->definitions.enums));
-
+  dump_typedefs(ARGS_V, &(code->definitions.typedefs));
 
   DUMP("\n\n// Core code //");
-  DUMP("//// Macros");
-  if (code->implementations.macros.count > 0) dump_macros(ARGS_V, &(code->implementations.macros));
-
-  DUMP("//// Structures");
-  if (code->implementations.structs.count > 0) dump_structures(ARGS_V, &(code->implementations.structs));
-
-  DUMP("//// Functions");
+  dump_macros(ARGS_V, &(code->implementations.macros));
+  dump_structures(ARGS_V, &(code->implementations.structs));
   dump_functions(ARGS_V, &(code->implementations.functions));
-
-  DUMP("//// Enums");
   dump_enums(ARGS_V, &(code->implementations.enums));
+  dump_typedefs(ARGS_V, &(code->implementations.typedefs));
 
   return 0;
 }
@@ -266,7 +282,8 @@ void summarise_parsing(source_code_t code) {
   }
 
   printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :\
-\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)\n",
+\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)\
+\n- %lu enumerators registered (%lu headers + %lu source)\n- %lu typedefs registered (%lu headers + %lu source)\n",
     code->definitions.variables.count,
     code->definitions.functions.count + code->implementations.functions.count,
     code->definitions.functions.count,
@@ -282,7 +299,13 @@ void summarise_parsing(source_code_t code) {
     source_var_macro,
     code->definitions.structs.count + code->implementations.structs.count,
     code->definitions.structs.count,
-    code->implementations.structs.count
+    code->implementations.structs.count,
+    code->definitions.enums.count + code->implementations.enums.count,
+    code->definitions.enums.count,
+    code->implementations.enums.count,
+    code->definitions.typedefs.count + code->implementations.typedefs.count,
+    code->definitions.typedefs.count,
+    code->implementations.typedefs.count
   );
 }
 

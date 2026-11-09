@@ -38,10 +38,10 @@ This is essentially a list of things to do, so I don't forget
 | Macros parsing | High | `N/A` | ✅ |
 | Structures parsing | Necessary | `N/A` | ✅ |
 | Functions parsing | Necessary | `N/A` | ✅ |
-| Typedef parsing | Necessary | `N/A` | 🏗️ |
+| Typedef parsing | Necessary | `N/A` | ✅ |
 | Include docstring for other types | Medium | For now, only the functions take the docstring | 🚧 |
 | Unamed functions arguments resolving | Low | Finish the resolving of unamed function arguments. This is mainly for arguments that are custom structs/enums/typedefs or standard types that don't fit in one word | 🚧 |
-| Types resolving | Necessary | Needs the typedef parsing to be done | 🚧 |
+| Types resolving | Necessary | Needs the typedef parsing to be done | 🏗️ |
 | Markdown writing | Necessary | Needs types resolved | 🚧 |
 
 > Legend :
