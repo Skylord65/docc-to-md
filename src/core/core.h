@@ -51,6 +51,7 @@ struct status_s {
   int reading_function_params;
   int reading_multiline_macro;
   int reading_multiline_struct;
+  int reading_multiline_enum;
 
   unsigned long long int line_count;
   void * data;
@@ -89,6 +90,13 @@ struct function_multiline_status_s {
   char multiline_parameter_buffer[ENTITIES_NAME_LENGTH * 2];
   unsigned int parameter_index;
 };
+struct enum_multiline_status_s {
+  char name[ENTITIES_NAME_LENGTH];
+  ulint starts_on_line;
+  ulint members_count;
+  struct enum_member * members;
+  fnt_modifier modifiers;
+};
 
 extern int normalize_type_string(const char * type, char * typebuf, int with_normalize_newline);
 extern int try_extract_variable(char * buffer, const char * path, callback_args args, struct status_s *);
@@ -98,5 +106,7 @@ extern int try_extract_struct(char * buffer, const char * path, callback_args ar
 extern int try_extract_struct_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_function(char * buffer, const char * path, callback_args args, struct status_s *);
 extern int try_extract_function_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
+extern int try_extract_enum(char * buffer, const char * path, callback_args, struct status_s *);
+extern int try_extract_enum_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 
 #endif

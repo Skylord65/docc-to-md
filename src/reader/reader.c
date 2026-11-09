@@ -69,12 +69,30 @@ static void free_functions(struct function_indic * functions) {
   }
   if (functions->count > 0 && functions->array != NULL) free(functions->array);
 }
+static void free_enum(struct enum_spec * enumerator) {
+  if (enumerator->members->count > 0) free(enumerator->members->array);
+
+  free(enumerator->ref);
+  free(enumerator->members);
+}
+static void free_enums(struct enum_indic * enumerators) {
+  if (enumerators->count > 0) {
+    ulint i = 0;
+    while (i < enumerators->count) {
+      free_enum(enumerators->array + i);
+      i++;
+    }
+    free(enumerators->array);
+  }
+}
 void free_source_code(source_code_t code) {
   free_variables(&(code->definitions.variables));
   free_macro_array(&(code->definitions.macros));
   free_macro_array(&(code->implementations.macros));
   free_functions(&(code->implementations.functions));
   free_functions(&(code->definitions.functions));
+  free_enums(&(code->definitions.enums));
+  free_enums(&(code->implementations.enums));
 
   free_structures_array(&(code->implementations.structs));
   free_structures_array(&(code->definitions.structs));
