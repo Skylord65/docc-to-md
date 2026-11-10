@@ -7,8 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#define GOTO_NEXTWORD(buffer) while (*(buffer) != ' ') buffer++;\
-while (*(buffer) == ' ') buffer++;
+#define GOTO_NEXTWORD(buffer) {\
+  while (*(buffer) != ' ') buffer++;\
+  while (*(buffer) == ' ') buffer++;\
+}
 
 struct register_primitive_data {
   char buffer[ENTITIES_NAME_LENGTH];
@@ -47,6 +49,38 @@ static int word_eq(const char * sentence, const char * word) {
     word++;
   }
   return *word == 0 && (*sentence == ' ' || *sentence == 0);
+}
+static struct struct_spec * try_parse_structure(char * input, source_code_t code) {
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
+
+  if (!starts_with(input, "struct")) return NULL;
+  GOTO_NEXTWORD(input);
+
+  char * end = input;
+  while (*end != ' ' && *end != 0) end++;
+  int changed = *end == ' ';
+  *end = 0;
+
+  ulint i = 0;
+  while (i < code->definitions.structs.count) {
+    if (streq(code->definitions.structs.array[i].name, input)) {
+      if (changed) *end = ' ';
+      return code->definitions.structs.array + i;
+    }
+    i++;
+  }
+  i = 0;
+  while (i < code->implementations.structs.count) {
+    if (streq(code->implementations.structs.array[i].name, input)) {
+      if (changed) *end = ' ';
+      return code->implementations.structs.array + i;
+    }
+    i++;
+  }
+  if (changed) *end = ' ';
+
+  return NULL;
 }
 /**
  * Returns 1 if a type has been successfully registered, 0 otherwise
@@ -199,6 +233,10 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
   init_primitive_data(&data);
 
+  if ((type->ptr = try_parse_structure(input, code)) != NULL) {
+    printf("  Parsed the structure %s\n", ((struct struct_spec *)type->ptr)->name);
+    return 0;
+  }
   if (try_parse_primitive(input, &data, &failed) == 0) {
     // Find the already registered primitive if it exists
     ulint i = 0;
