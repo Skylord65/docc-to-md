@@ -20,8 +20,42 @@ struct register_primitive_data {
   unsigned int pointers_level;
   struct arrays_spec arrays;
 };
-static void compute_rest_of_type(char * input, entity_type_t * type) {
+/**
+ * This function takes a pointer to a supposed type string where it only remains pointers and arrays to register, and modifies 'type'
+ *
+ * return 0 if everything alright, 1 otherwise
+ */
+static int compute_rest_of_type(char * input, entity_type_t * type) {
+  char buf[ENTITIES_NAME_LENGTH];
+  int bufindex = 0;
+  int writeinbuf = 0;
 
+  while (*input != 0) {
+    if (*input == '*') type->pointers_level++;
+    else if (!writeinbuf) {
+      if (*input == '[') writeinbuf = 1;
+    } else {
+      if (*input == ']') {
+        if ((type->arrays.array = realloc(type->arrays.array, sizeof(char *) * (type->arrays.count + 1))) == NULL) {
+          perror("realloc compute_rest_of_type");
+          return 1;
+        }
+        if (bufindex == 0) type->arrays.array[type->arrays.count] = NULL;
+        else {
+          buf[bufindex++] = 0;
+          if ((type->arrays.array[type->arrays.count] = strdup(buf)) == NULL) {
+            perror("strdup compute_rest_of_type");
+            return 1;
+          }
+        }
+        type->arrays.count++;
+        bufindex = 0;
+        writeinbuf = 0;
+      } else buf[bufindex++] = *input;
+    }
+    input++;
+  }
+  return 0;
 }
 static int register_primitive(source_code_t code, struct register_primitive_data * data) {
   if ((code->primitives.array = realloc(code->primitives.array, sizeof(struct primitive_spec) * (code->primitives.count + 1))) == NULL) {
@@ -53,7 +87,7 @@ static int word_eq(const char * sentence, const char * word) {
   }
   return *word == 0 && (*sentence == ' ' || *sentence == 0);
 }
-static struct struct_spec * try_parse_structure(char * input, source_code_t code) {
+static struct struct_spec * try_parse_structure(char * input, source_code_t code, char ** restptr) {
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
 
@@ -64,6 +98,7 @@ static struct struct_spec * try_parse_structure(char * input, source_code_t code
   while (*end != ' ' && *end != 0) end++;
   int changed = *end == ' ';
   *end = 0;
+  *restptr = end;
 
   ulint i = 0;
   while (i < code->definitions.structs.count) {
@@ -236,8 +271,13 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
   init_primitive_data(&data);
 
-  if ((type->ptr = try_parse_structure(input, code)) != NULL) {
+  char * input_rest;
+  if ((type->ptr = try_parse_structure(input, code, &input_rest)) != NULL) {
     printf("  Parsed the structure %s\n", ((struct struct_spec *)type->ptr)->name);
+    type->type = StructureType;
+    if (compute_rest_of_type(input_rest, type) != 0) {
+      return 1;
+    }
     return 0;
   }
   if (try_parse_primitive(input, &data, &failed) == 0) {
@@ -276,6 +316,7 @@ int linkage(source_code_t code, callback_args args) {
   while (i < code->definitions.functions.count) {
     if (assign_type(code, code->definitions.functions.array[i].returntype.string, &(code->definitions.functions.array[i].returntype)) != 0) {
       fprintf(stderr, "Cannot assign type to %s (return type of function %s)\n", code->definitions.functions.array[i].returntype.string, code->definitions.functions.array[i].name);
+      args->results.fails++;
       return 1;
     }
     i++;
