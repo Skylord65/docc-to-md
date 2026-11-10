@@ -12,6 +12,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          sudo pacman -Sy --noconfirm time
+
       - name: Modify makefile
         run: |
           set -euo pipefail
@@ -33,4 +37,25 @@ jobs:
           set -euo pipefail
 
           echo "Testing program with all possible arguments against itself"
-          ./bin/main.uwu --src src --dest test/out -d --dump test/dump --verbose-registration --enable-commentdoc --work test/work
+          set +e
+          /usr/bin/time -f 'Peak RAM: %M KiB' -o peak_ram.txt \
+            timeout --kill-after=10s 5m \
+            ./bin/main.uwu \
+              --src src \
+              --dest test/out \
+              -d \
+              --dump test/dump \
+              --verbose-registration \
+              --enable-commentdoc \
+              --work test/work
+
+          status=$?
+          set -e
+
+          cat peak_ram.txt
+          if [ "$status" -eq 124 ]; then
+            echo "::error::Program exceeded the 5 minute limit and was interrupted."
+            exit 124
+          elif [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
