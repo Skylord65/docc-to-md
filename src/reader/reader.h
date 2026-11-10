@@ -104,6 +104,49 @@ struct macro_spec {
   struct macro_args * args;
   reference_t ref;
 };
+typedef enum {
+  GlibC          = 0x00000000000001,
+  Stdio          = 0x00000000000010,
+  Stdbool        = 0x00000000000100,
+  Stdint         = 0x00000000001000,
+  Unistd         = 0x00000000010000,
+  Fcntl          = 0x00000000100000,
+  SysStat        = 0x00000001000000,
+  SysDir         = 0x00000010000000,
+  LibStringpGrep = 0x00000100000000,
+  Stdtime        = 0x00001000000000,
+  Stddef         = 0x00010000000000,
+  SysTypes       = 0x00100000000000,
+  Stdlib         = 0x01000000000000,
+  Dirent         = 0x10000000000000,
+} PrimitiveSource;
+
+#define P_TGLIBC(x) ((x & GlibC) == GlibC)
+#define P_TSTDIO(x) ((x & Stdio) == Stdio)
+#define P_TSTDBOOL(x) ((x & Stdbool) == Stdbool)
+#define P_TSTDINT(x) ((x & Stdint) == Stdint)
+#define P_TUNISTD(x) ((x & Unistd) == Unistd)
+#define P_TFCNTL(x) ((x & Fcntl) == Fcntl)
+#define P_TSYSSTAT(x) ((x & SysStat) == SysStat)
+#define P_TSYSDIR(x) ((x & SysDir) == SysDir)
+#define P_TLIBSTRINGPGREP(x) ((x & LibStringpGrep) == LibStringpGrep)
+#define P_TSTDTIME(x) ((x & Stdtime) == Stdtime)
+#define P_TSTDDEF(x) ((x & Stddef) == Stddef)
+#define P_TSYSTYPES(x) ((x & SysTypes) == SysTypes)
+#define P_TSTDLIB(x) ((x & Stdlib) == Stdlib)
+#define P_TDIRENT(x) ((x & Dirent) == Dirent)
+
+struct primitive_arrays_spec {
+  ulint count;
+  char ** array;
+};
+struct primitive_spec {
+  char name[ENTITIES_NAME_LENGTH];
+  PrimitiveSource source;
+  char is_constant;
+  unsigned int pointers_level;
+  struct primitive_arrays_spec arrays;
+};
 struct variable {
   reference_t ref;
   entity_type_t * type;
@@ -134,6 +177,10 @@ struct enum_indic {
   ulint count;
   struct enum_spec * array;
 };
+struct primitives_indic {
+  ulint count;
+  struct primitive_spec * array;
+};
 
 struct source_code_defs {
   struct function_indic  functions;
@@ -154,10 +201,13 @@ struct source_code_impls {
 struct source_code {
   struct source_code_impls implementations;
   struct source_code_defs definitions;
+
+  struct primitives_indic primitives;
 };
 
 typedef struct source_code * source_code_t;
 
+void init_source_code(source_code_t);
 void free_source_code(source_code_t);
 int dump_source_code(const source_code_t, int fd);
 void summarise_parsing(source_code_t);

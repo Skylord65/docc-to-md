@@ -98,6 +98,22 @@ static void free_typedefs(struct typedef_indic * tds) {
   }
   free(tds->array);
 }
+static void free_primitives(struct primitives_indic * primitives) {
+  ulint i = 0;
+  while (i < primitives->count) {
+    if (primitives->array[i].arrays.count > 0) {
+      ulint j = 0;
+      while (j < primitives->array[i].arrays.count) {
+        if (primitives->array[i].arrays.array[j] != NULL) free(primitives->array[i].arrays.array[j]);
+        j++;
+      }
+
+      free(primitives->array[i].arrays.array);
+    }
+    i++;
+  }
+  if (primitives->count > 0) free(primitives->array);
+}
 void free_source_code(source_code_t code) {
   free_variables(&(code->definitions.variables));
   free_macro_array(&(code->definitions.macros));
@@ -111,7 +127,26 @@ void free_source_code(source_code_t code) {
 
   free_structures_array(&(code->implementations.structs));
   free_structures_array(&(code->definitions.structs));
+
+  free_primitives(&(code->primitives));
 }
+#define INIT(code, word) code->definitions.word.array = NULL;\
+code->definitions.word.count = 0;\
+code->implementations.word.array = NULL;\
+code->implementations.word.count = 0;
+
+void init_source_code(source_code_t code) {
+  code->primitives.array = NULL;
+  code->primitives.count = 0;
+  code->definitions.variables.count = 0;
+  code->definitions.variables.array = NULL;
+  INIT(code, structs);
+  INIT(code, typedefs);
+  INIT(code, enums);
+  INIT(code, functions);
+  INIT(code, macros);
+}
+#undef INIT
 
 #define ARGS_T char * buffer, int fd
 #define ARGS_V buffer, fd
@@ -242,10 +277,74 @@ static void dump_typedefs(ARGS_T, struct typedef_indic * indic) {
     i++;
   }
 }
+#define PRIMITIVE_DUMP(p, TEST_MACRO, text) if (TEST_MACRO(p->source)) DUMP(" - " text);
+static void dump_primitive(ARGS_T, struct primitive_spec * primitive) {
+  char namebuf[ENTITIES_NAME_LENGTH * 2];
+  int index = 0;
+  if (primitive->is_constant) {
+    sprintf(namebuf, "const ");
+    index+=6;
+  }
+  ulint nameindex = 0;
+  while (primitive->name[nameindex] != 0 && index < ENTITIES_NAME_LENGTH) {
+    namebuf[index] = primitive->name[nameindex];
+    index++;
+    nameindex++;
+  }
+  if (primitive->pointers_level > 0) {
+    namebuf[index++] = ' ';
+    ulint count = 0;
+    while (count < primitive->pointers_level) {
+      namebuf[index++] = '*';
+      count++;
+    }
+  }
+  if (primitive->arrays.count > 0) {
+    namebuf[index++] = ' ';
+    ulint i = 0;
+    while (i < primitive->arrays.count) {
+      namebuf[index++] = '[';
+      if (primitive->arrays.array[i] != NULL) {
+        ulint j = 0;
+        while (j < primitive->arrays.count && primitive->arrays.array[i][j] != 0) namebuf[index++] = primitive->arrays.array[i][j++];
+      }
+      namebuf[index++] = ']';
+    }
+  }
+  namebuf[index++] = 0;
+  DUMP("/Primitive %s\nContains elements of :", namebuf);
+  PRIMITIVE_DUMP(primitive, P_TGLIBC, "GLibC");  
+  PRIMITIVE_DUMP(primitive, P_TSTDINT, "stdint.h");
+  PRIMITIVE_DUMP(primitive, P_TFCNTL, "fcntl.h");
+  PRIMITIVE_DUMP(primitive, P_TDIRENT, "dirent.h");
+  PRIMITIVE_DUMP(primitive, P_TLIBSTRINGPGREP, "stringpgrep.h");
+  PRIMITIVE_DUMP(primitive, P_TSTDBOOL, "stdbool.h");
+  PRIMITIVE_DUMP(primitive, P_TSTDDEF, "stddef.h");
+  PRIMITIVE_DUMP(primitive, P_TSTDIO, "stdio.h");
+  PRIMITIVE_DUMP(primitive, P_TSTDLIB, "stdlib.h");
+  PRIMITIVE_DUMP(primitive, P_TSTDTIME, "time.h");
+  PRIMITIVE_DUMP(primitive, P_TSYSDIR, "sys/dir.h");
+  PRIMITIVE_DUMP(primitive, P_TSYSSTAT, "sys/stat.h");
+  PRIMITIVE_DUMP(primitive, P_TSYSTYPES, "sys/types.h");
+  PRIMITIVE_DUMP(primitive, P_TUNISTD, "unistd.h");
+
+  DUMP(" ");
+}
+#undef PRIMITIVE_DUMP
+static void dump_primitives(ARGS_T, const struct primitives_indic * indic) {
+  DUMP("////PRIMITIVES");
+  ulint i = 0;
+  while (i < indic->count) {
+    dump_primitive(ARGS_V, indic->array + i);
+    i++;
+  }
+}
+
 int dump_source_code(const source_code_t code, int fd) {
   char buffer[BUFSIZ];
 
   DUMP("// Headers //");
+  dump_primitives(ARGS_V, &(code->primitives));
   dump_variables(ARGS_V, &(code->definitions.variables));
   dump_macros(ARGS_V, &(code->definitions.macros));
   dump_structures(ARGS_V, &(code->definitions.structs));
