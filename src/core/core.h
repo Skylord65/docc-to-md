@@ -124,4 +124,6 @@ extern int try_extract_enum_multiline(char * buffer, const char * path, callback
 extern int try_extract_typedef(char * buffer, const char * path, callback_args, struct status_s *);
 extern int try_extract_typedef_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 
+extern int linkage(source_code_t code, callback_args args);
+
 #endif

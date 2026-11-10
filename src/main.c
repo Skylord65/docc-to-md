@@ -82,6 +82,7 @@ int main(int argc, char * argv[]) {
       .fails = 0
     }
   };
+  init_source_code(callback_args.source_code);
   recursion(config.src, &callback_args, remove_comments_callback);
   if (callback_args.results.fails > 0) {
     fprintf(stderr, "Failed to remove comments flawlessly.\n");
@@ -90,7 +91,14 @@ int main(int argc, char * argv[]) {
   }
   recursion(config.work, &callback_args, recursion_callback);
   if (args[8].found) recursion(config.src, &callback_args, register_doccumments_callback);
+  if (callback_args.results.fails > 0) {
+    fprintf(stderr, "Failed to parse content");
+    cleanup(&config);
+    free_source_code(callback_args.source_code);
+    return 1;
+  }
   if (args[7].found) summarise_parsing(callback_args.source_code);
+  if (linkage(callback_args.source_code, &callback_args) != 0) {}
 
   dump(callback_args.source_code, args[5], args[6]);
 
