@@ -20,6 +20,9 @@ struct register_primitive_data {
   unsigned int pointers_level;
   struct arrays_spec arrays;
 };
+static void compute_rest_of_type(char * input, entity_type_t * type) {
+
+}
 static int register_primitive(source_code_t code, struct register_primitive_data * data) {
   if ((code->primitives.array = realloc(code->primitives.array, sizeof(struct primitive_spec) * (code->primitives.count + 1))) == NULL) {
     perror("realloc primitive array");
@@ -243,13 +246,13 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
     while (i < code->primitives.count) {
       struct primitive_spec * spec = code->primitives.array + i;
       if (
-        spec->is_constant == data.is_constant &&
-        spec->pointers_level == data.pointers_level &&
-        spec->source == data.source &&
-        spec->arrays.count == data.arrays.count &&
-        streq(data.buffer, spec->name) &&
-        check_array_equality(data.arrays.array, spec->arrays.array, spec->arrays.count)
-      ) { // Then they are the same
+          spec->is_constant == data.is_constant &&
+          spec->pointers_level == data.pointers_level &&
+          spec->source == data.source &&
+          spec->arrays.count == data.arrays.count &&
+          streq(data.buffer, spec->name) &&
+          check_array_equality(data.arrays.array, spec->arrays.array, spec->arrays.count)
+         ) { // Then they are the same
         type->ptr = spec;
         type->type = PrimitiveType;
         free_primitive_data(&data);

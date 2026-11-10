@@ -98,7 +98,7 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   if (args[7].found) summarise_parsing(callback_args.source_code);
-  if (linkage(callback_args.source_code, &callback_args) != 0) {}
+  //if (linkage(callback_args.source_code, &callback_args) != 0) {}
 
   dump(callback_args.source_code, args[5], args[6]);
 
