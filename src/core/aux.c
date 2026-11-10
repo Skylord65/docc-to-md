@@ -1648,6 +1648,7 @@ static char * obtain_last_word_from_end(char * end) {
   *(end + 1) = 0;
   *(word - 1) = 0;
 
+  if (*word == ')' || *word == '}') return word + 1;
   return word;
 }
 static int register_typedef(const char * path, callback_args args, struct status_s * status) {
@@ -1767,6 +1768,7 @@ int try_extract_typedef(char * buffer, const char * path, callback_args params, 
     }
     buffer++;
   }
+  if (*buffer == '\n') data->buffer[data->buffer_index++] = ' ';
   // If we are here we didn't trigger the end, so just continue on the next lines
   status->reading_multiline_typedef = 1;
   status->data = data;
@@ -1797,6 +1799,7 @@ int try_extract_typedef_multiline(char * buffer, const char * path, callback_arg
     }
     buffer++;
   }
+  if (*buffer == '\n') data->buffer[data->buffer_index++] = ' ';
   return 0;
 }
 
