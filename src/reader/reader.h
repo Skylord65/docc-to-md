@@ -35,10 +35,16 @@ typedef enum {
   PrimitiveType = 5
 } TypeTypeIndicator;
 
+struct arrays_spec {
+  ulint count;
+  char ** array;
+};
 typedef struct {
   TypeTypeIndicator type;
   char string[ENTITIES_NAME_LENGTH];
   void * ptr;
+  unsigned int pointers_level;
+  struct arrays_spec arrays;
 } entity_type_t;
 
 // Members types
@@ -136,16 +142,12 @@ typedef enum {
 #define P_TSTDLIB(x) ((x & Stdlib) == Stdlib)
 #define P_TDIRENT(x) ((x & Dirent) == Dirent)
 
-struct primitive_arrays_spec {
-  ulint count;
-  char ** array;
-};
 struct primitive_spec {
   char name[ENTITIES_NAME_LENGTH];
   PrimitiveSource source;
   char is_constant;
   unsigned int pointers_level;
-  struct primitive_arrays_spec arrays;
+  struct arrays_spec arrays;
 };
 struct variable {
   reference_t ref;

@@ -18,7 +18,7 @@ struct register_primitive_data {
   PrimitiveSource source;
   char is_constant;
   unsigned int pointers_level;
-  struct primitive_arrays_spec arrays;
+  struct arrays_spec arrays;
 };
 static int register_primitive(source_code_t code, struct register_primitive_data * data) {
   if ((code->primitives.array = realloc(code->primitives.array, sizeof(struct primitive_spec) * (code->primitives.count + 1))) == NULL) {

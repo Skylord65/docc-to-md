@@ -3,6 +3,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static void free_type(entity_type_t * type) {
+  if (type->arrays.count > 0) {
+    ulint i = 0;
+    while (i < type->arrays.count) {
+      if (type->arrays.array[i] != NULL) free(type->arrays.array[i]);
+      i++;
+    }
+    free(type->arrays.array);
+  }
+}
 static void free_macro(struct macro_spec * macro) {
   if (macro->is_function) {
     if (macro->args->count > 0) {
@@ -31,6 +41,11 @@ static void free_macro_array(struct macro_indic * macros) {
 }
 static void free_structure(struct struct_spec * structure) {
   if (structure->members->count > 0 && structure->members->array != NULL) {
+    ulint i = 0;
+    while (i < structure->members->count) {
+      free_type(&(structure->members->array[i].type));
+      i++;
+    }
     free(structure->members->array);
   }
   free(structure->members);
@@ -56,7 +71,14 @@ static void free_variables(struct variables_indic * variables) {
   free(variables->array);
 }
 static void free_function(struct function_spec * function) {
-  if (function->args->count > 0 && function->args->array != NULL) free(function->args->array);
+  if (function->args->count > 0 && function->args->array != NULL) {
+    ulint i = 0;
+    while (i < function->args->count) {
+      free_type(&(function->args->array[i].type));
+      i++;
+    }
+    free(function->args->array);
+  }
   if (function->description != NULL) free(function->description);
   free(function->args);
   free(function->ref);
@@ -87,7 +109,10 @@ static void free_enums(struct enum_indic * enumerators) {
 }
 static void free_typedef(struct typedef_spec * td) {
   if (td->ref != NULL) free(td->ref);
-  if (td->definition != NULL) free(td->definition);
+  if (td->definition != NULL) {
+    free_type(td->definition);
+    free(td->definition);
+  }
   if (td->buffer != NULL) free(td->buffer);
 }
 static void free_typedefs(struct typedef_indic * tds) {

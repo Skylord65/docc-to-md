@@ -248,6 +248,9 @@ int try_extract_variable(char * buffer, const char * path, callback_args params,
     }
     var->ref->line = status->line_count;
     rebase_path(path, params->config->work, params->config->src, var->ref->filename, PATH_MAX);
+    var->type->arrays.count = 0;
+    var->type->arrays.array = NULL;
+    var->type->pointers_level = 0;
     STRCP(var_name, var->name, ENTITIES_NAME_LENGTH, 1);
     STRCP(input, var->type->string, ENTITIES_NAME_LENGTH, 1);
 
@@ -650,6 +653,9 @@ static int register_structure(const char * filename, callback_args params, struc
       STRCP(typebuf, structure->members->array[i].type.string, ENTITIES_NAME_LENGTH, 1);
       structure->members->array[i].type.type = NoneType;
       structure->members->array[i].type.ptr = NULL;
+      structure->members->array[i].type.pointers_level = 0;
+      structure->members->array[i].type.arrays.count = 0;
+      structure->members->array[i].type.arrays.array = NULL;
       free(data->members_array[i]);
 
       if (free_type) free(typebuf);
@@ -1044,6 +1050,9 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
   data->args = NULL;
   data->returntype.type = NoneType;
   data->returntype.ptr = NULL;
+  data->returntype.pointers_level = 0;
+  data->returntype.arrays.count = 0;
+  data->returntype.arrays.array = NULL;
   data->returntype.string[0] = 0;
   data->name[0] = 0;
   data->starts_on_line = status->line_count;
