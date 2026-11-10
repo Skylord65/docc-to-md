@@ -6,7 +6,7 @@
 static void free_type(entity_type_t * type) {
   if (type->arrays.count > 0) {
     ulint i = 0;
-    while (i < type->arrays.count) {
+    while (i < type->arrays.count && type->arrays.array != NULL) {
       if (type->arrays.array[i] != NULL) free(type->arrays.array[i]);
       i++;
     }

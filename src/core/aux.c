@@ -867,6 +867,11 @@ incomplete:
 }
 static void register_function(const char * path, callback_args params, struct status_s * status) {
   struct function_multiline_status_s * data = status->data;
+  // Do some checks before registering, like keywords that could have a parenthesis "if"
+  if (streq_with_crumb(data->name, "if", ' ')) {
+    FREE_DATA(status, data);
+    return;
+  }
 
   struct function_spec * function;
   if (status->is_header) {
@@ -998,6 +1003,9 @@ almost_complete_fail:
       STRCP(input, function->args->array[i].type.string, ENTITIES_NAME_LENGTH, 1);
       function->args->array[i].type.type = NoneType;
       function->args->array[i].type.ptr = NULL;
+      function->args->array[i].type.pointers_level = 0;
+      function->args->array[i].type.arrays.array = NULL;
+      function->args->array[i].type.arrays.count = 0;
 
       free(input);
       i++;
@@ -1012,6 +1020,9 @@ if_exit:
   function->modifiers = data->modifiers;
   function->returntype.type = data->returntype.type;
   function->returntype.ptr = NULL;
+  function->returntype.pointers_level = 0;
+  function->returntype.arrays.array = NULL;
+  function->returntype.arrays.count = 0;
   function->description = NULL;
 
   FREE_DATA(status, data);
@@ -1067,6 +1078,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
   char * arg_check = NULL;
   char * typestart = buffer;
   while (*buffer != 0 && *buffer != '\n') {
+    if (IS_CHAR_DEL(start, buffer) || IS_STRING_DEL(start, buffer)) {}
     if (!data->reading_args) {
       if (start == buffer || *(buffer - 1) == ' ') {
         if (word_eq(buffer, "extern")) {

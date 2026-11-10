@@ -92,7 +92,7 @@ int main(int argc, char * argv[]) {
   recursion(config.work, &callback_args, recursion_callback);
   if (args[8].found) recursion(config.src, &callback_args, register_doccumments_callback);
   if (callback_args.results.fails > 0) {
-    fprintf(stderr, "Failed to parse content");
+    fprintf(stderr, "Failed to parse content\n");
     cleanup(&config);
     free_source_code(callback_args.source_code);
     return 1;
