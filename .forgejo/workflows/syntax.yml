@@ -80,7 +80,7 @@ jobs:
       - name: Configure (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cmake -S . -B build-cmake -G "Visual Studio 17 2022" -A x64 `
+          cmake -S . -B build-cmake -G "Visual Studio 18 2026" -A x64 `
             -DUWU_WERROR=ON -DUWU_NODEBUG=OFF -DUWU_SANITIZE=OFF
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
