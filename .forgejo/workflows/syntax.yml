@@ -77,100 +77,49 @@ jobs:
             exit "$status"
           fi
 
-      - name: Setup MSVC environment
+      - name: Configure (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          $ErrorActionPreference = "Stop"
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          if (-not (Test-Path $vswhere)) { throw "vswhere.exe introuvable" }
-
-          Write-Host "== Installations VS détectées =="
-          & $vswhere -all -products * -format text
-
-          $vsPath = & $vswhere -latest -products * `
-            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
-          if (-not $vsPath) {
-            throw "Aucune installation VS avec le composant C++ (VC.Tools.x86.x64)"
-          }
-
-          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
-          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat introuvable: $vcvars" }
-
-          $bat = Join-Path $env:TEMP "setup_msvc.bat"
-          Set-Content -Path $bat -Value "@echo off`r`ncall `"$vcvars`" >nul`r`nset" -Encoding ASCII
-
-          & $env:ComSpec /c $bat | ForEach-Object {
-            if ($_ -match '^([^=]+)=(.*)$') {
-              Add-Content -Path $env:GITHUB_ENV -Value "$($matches[1])=$($matches[2])"
-            }
-          }
+          cmake -S . -B build-cmake -G "Visual Studio 17 2022" -A x64 `
+            -DUWU_WERROR=ON -DUWU_NODEBUG=OFF -DUWU_SANITIZE=OFF
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Modify makefile (Windows)
-
-        if: matrix.os == 'windows-latest'
-        run: |
-
-          where.exe cl
-          where.exe nmake
-
-          $ErrorActionPreference = "Stop"
-          $content = Get-Content makefile -Raw
-          # Équivalent MSVC de -Werror (/WX) et suppression de -DNODEBUG
-          $content = $content -replace '(FLAGS=.*)', '$1 /WX'
-          $content = $content -replace '(CLEANBUILD_FLAGS=.*)', '$1 /WX'
-          $content = $content -replace ' \?-DNODEBUG', ''
-          Set-Content makefile $content
-          Get-Content makefile
-
       - name: Compile and see (Windows)
-
         if: matrix.os == 'windows-latest'
         run: |
-          $ErrorActionPreference = "Stop"
-          # Utilise nmake (natif MSVC) ou make si installé sur votre runner
-          nmake DEBUG=1
-          nmake clean
-          nmake cleanbuild DEBUG=1
+          cmake --build build-cmake --config Debug --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-cmake --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check program against itself (Windows)
-        
         if: matrix.os == 'windows-latest'
         run: |
           $ErrorActionPreference = "Stop"
           Write-Host "Testing program with all possible arguments against itself"
-          
+
           $argsList = @(
-            "--src", "src",
-            "--dest", "test/out",
-            "-d",
-            "--dump", "test/dump",
-            "--verbose-registration",
-            "--enable-commentdoc",
-            "--work", "test/work"
+            "--src", "src", "--dest", "test/out", "-d",
+            "--dump", "test/dump", "--verbose-registration",
+            "--enable-commentdoc", "--work", "test/work"
           )
 
-          # Exécution avec suivi du pic mémoire et timeout de 5 minutes (300000 ms)
           $proc = Start-Process -FilePath ".\bin\main.uwu.exe" -ArgumentList $argsList -NoNewWindow -PassThru
+          $null = $proc.Handle   # nécessaire pour que ExitCode ne soit pas $null
           $peakBytes = 0
+          $start = Get-Date
 
           while (-not $proc.HasExited) {
             $proc.Refresh()
-            if ($proc.PeakWorkingSet64 -gt $peakBytes) {
-              $peakBytes = $proc.PeakWorkingSet64
-            }
-            if ((New-TimeSpan -Start $proc.StartTime).TotalMinutes -ge 5) {
+            if ($proc.PeakWorkingSet64 -gt $peakBytes) { $peakBytes = $proc.PeakWorkingSet64 }
+            if (((Get-Date) - $start).TotalMinutes -ge 5) {
               Stop-Process -Id $proc.Id -Force
               Write-Host "::error::Program exceeded the 5 minute limit and was interrupted."
               exit 124
             }
             Start-Sleep -Milliseconds 100
           }
+          $proc.WaitForExit()
 
-          $peakKiB = [math]::Round($peakBytes / 1024)
-          Write-Host "Peak RAM: $peakKiB KiB"
-
-          if ($proc.ExitCode -ne 0) {
-            exit $proc.ExitCode
-          }
+          Write-Host ("Peak RAM: {0} KiB" -f [math]::Round($peakBytes / 1024))
+          if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
