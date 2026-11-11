@@ -1,4 +1,5 @@
 #include "reader.h"
+#include "../core/core.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -64,6 +65,7 @@ static void free_structures_array(struct struct_indic * structures) {
 static void free_variables(struct variables_indic * variables) {
   ulint i = 0;
   while (i < variables->count) {
+    if (variables->array[i].type != NULL) free_type(variables->array[i].type);
     free(variables->array[i].type);
     free(variables->array[i].ref);
     i++;
@@ -71,7 +73,7 @@ static void free_variables(struct variables_indic * variables) {
   free(variables->array);
 }
 static void free_function(struct function_spec * function) {
-  if (function->args->count > 0 && function->args->array != NULL) {
+  if (function->args != NULL && function->args->count > 0 && function->args->array != NULL) {
     ulint i = 0;
     while (i < function->args->count) {
       free_type(&(function->args->array[i].type));
@@ -109,10 +111,17 @@ static void free_enums(struct enum_indic * enumerators) {
 }
 static void free_typedef(struct typedef_spec * td) {
   if (td->ref != NULL) free(td->ref);
-  if (td->definition != NULL) {
-    free_type(td->definition);
-    free(td->definition);
+  if (td->definition.type == TypedefinedStructure) {
+    free_structure(td->definition.ptr);
+    free(td->definition.ptr);
+  } else if (td->definition.type == TypedefinedEnum) {
+    free_enum(td->definition.ptr);
+    free(td->definition.ptr);
+  } else if (td->definition.type == TypedefinedFunction) {
+    free_function(td->definition.ptr);
+    free(td->definition.ptr);
   }
+  free_type(&(td->definition));
   if (td->buffer != NULL) free(td->buffer);
 }
 static void free_typedefs(struct typedef_indic * tds) {
@@ -124,19 +133,6 @@ static void free_typedefs(struct typedef_indic * tds) {
   free(tds->array);
 }
 static void free_primitives(struct primitives_indic * primitives) {
-  ulint i = 0;
-  while (i < primitives->count) {
-    if (primitives->array[i].arrays.count > 0) {
-      ulint j = 0;
-      while (j < primitives->array[i].arrays.count) {
-        if (primitives->array[i].arrays.array[j] != NULL) free(primitives->array[i].arrays.array[j]);
-        j++;
-      }
-
-      free(primitives->array[i].arrays.array);
-    }
-    i++;
-  }
   if (primitives->count > 0) free(primitives->array);
 }
 void free_source_code(source_code_t code) {
@@ -269,8 +265,8 @@ static void dump_enum(ARGS_T, struct enum_spec * enumerator) {
   DUMP("/Enumerator %s\nDefined in %s:%lu\nenum {", enumerator->name, enumerator->ref->filename, enumerator->ref->line);
   ulint j = 0;
   while (j < enumerator->members->count) {
-    if (j == enumerator->members->count - 1) DUMP("  %s = %lld", enumerator->members->array[j].name, enumerator->members->array[j].value)
-    else DUMP("  %s = %lld%c", enumerator->members->array[j].name, enumerator->members->array[j].value, ',');
+    if (j == enumerator->members->count - 1) DUMP("  %s = %s", enumerator->members->array[j].name, enumerator->members->array[j].value)
+    else DUMP("  %s = %s%c", enumerator->members->array[j].name, enumerator->members->array[j].value, ',');
     j++;
   }
   DUMP("}");
@@ -306,35 +302,15 @@ static void dump_typedefs(ARGS_T, struct typedef_indic * indic) {
 static void dump_primitive(ARGS_T, struct primitive_spec * primitive) {
   char namebuf[ENTITIES_NAME_LENGTH * 2];
   int index = 0;
-  if (primitive->is_constant) {
-    sprintf(namebuf, "const ");
-    index+=6;
+  if (primitive->is_structure) {
+    sprintf(namebuf, "struct ");
+    index += 7;
   }
   ulint nameindex = 0;
   while (primitive->name[nameindex] != 0 && index < ENTITIES_NAME_LENGTH) {
     namebuf[index] = primitive->name[nameindex];
     index++;
     nameindex++;
-  }
-  if (primitive->pointers_level > 0) {
-    namebuf[index++] = ' ';
-    ulint count = 0;
-    while (count < primitive->pointers_level) {
-      namebuf[index++] = '*';
-      count++;
-    }
-  }
-  if (primitive->arrays.count > 0) {
-    namebuf[index++] = ' ';
-    ulint i = 0;
-    while (i < primitive->arrays.count) {
-      namebuf[index++] = '[';
-      if (primitive->arrays.array[i] != NULL) {
-        ulint j = 0;
-        while (j < primitive->arrays.count && primitive->arrays.array[i][j] != 0) namebuf[index++] = primitive->arrays.array[i][j++];
-      }
-      namebuf[index++] = ']';
-    }
   }
   namebuf[index++] = 0;
   DUMP("/Primitive %s\nContains elements of :", namebuf);
@@ -405,16 +381,16 @@ void summarise_parsing(source_code_t code) {
     i++;
   }
 
-  printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :\
-\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)\
-\n- %lu enumerators registered (%lu headers + %lu source)\n- %lu typedefs registered (%lu headers + %lu source)\n",
+  printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :",
     code->definitions.variables.count,
     code->definitions.functions.count + code->implementations.functions.count,
     code->definitions.functions.count,
     code->implementations.functions.count,
     code->definitions.macros.count + code->implementations.macros.count,
     code->definitions.macros.count,
-    code->implementations.macros.count,
+    code->implementations.macros.count
+  );
+  printf("\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)",
     header_fnt_macro + source_fnt_macro,
     header_fnt_macro,
     source_fnt_macro,
@@ -423,7 +399,9 @@ void summarise_parsing(source_code_t code) {
     source_var_macro,
     code->definitions.structs.count + code->implementations.structs.count,
     code->definitions.structs.count,
-    code->implementations.structs.count,
+    code->implementations.structs.count
+  );
+  printf("\n- %lu enumerators registered (%lu headers + %lu source)\n- %lu typedefs registered (%lu headers + %lu source)\n------------------------------------\n",
     code->definitions.enums.count + code->implementations.enums.count,
     code->definitions.enums.count,
     code->implementations.enums.count,
@@ -431,6 +409,11 @@ void summarise_parsing(source_code_t code) {
     code->definitions.typedefs.count,
     code->implementations.typedefs.count
   );
+}
+
+void summarise_linking(const callback_args args) {
+  if (!(args->config->verbose_registration)) return;
+  printf("------------------------------------\n%lu links made\n------------------------------------\n", args->results.links);
 }
 
 #undef ARGS_T

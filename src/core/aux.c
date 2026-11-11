@@ -865,7 +865,7 @@ incomplete:
   free(data);\
   status->data = NULL;\
 }
-static void register_function(const char * path, callback_args params, struct status_s * status) {
+void register_function(const char * path, callback_args params, struct status_s * status) {
   struct function_multiline_status_s * data = status->data;
   // Do some checks before registering, like keywords that could have a parenthesis "if"
   if (streq_with_crumb(data->name, "if", ' ')) {
@@ -874,7 +874,14 @@ static void register_function(const char * path, callback_args params, struct st
   }
 
   struct function_spec * function;
-  if (status->is_header) {
+  if (data->doubleptr != NULL) {
+    if ((*(data->doubleptr) = malloc(sizeof(struct function_spec))) == NULL) {
+      perror("malloc struct function_specs");
+      params->results.fails++;
+      return;
+    }
+    function = *(data->doubleptr);
+  } else if (status->is_header) {
     if (params->source_code->definitions.functions.count == 0) {
       if ((params->source_code->definitions.functions.array = malloc(sizeof(struct function_spec))) == NULL) {
         perror("malloc struct function_spec");
@@ -911,15 +918,17 @@ static void register_function(const char * path, callback_args params, struct st
   }
   if ((function->ref = malloc(sizeof(struct reference))) == NULL) {
     perror("malloc function->ref");
-    if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
+    if (data->doubleptr != NULL || GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
     FREE_DATA(status, data);
+    params->results.fails++;
     return;
   }
   if ((function->args = malloc(sizeof(struct function_args))) == NULL) {
     perror("malloc function->args");
     free(function->ref);
-    if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
+    if (data->doubleptr != NULL || GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
     FREE_DATA(status, data);
+    params->results.fails++;
     return;
   }
   function->args->count = data->args_count;
@@ -952,7 +961,7 @@ almost_complete_fail:
         free(function->ref);
         free(function->args->array);
         free(function->args);
-        if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
+        if (data->doubleptr != NULL || GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
         FREE_DATA(status, data);
         if (status->is_header) params->source_code->definitions.functions.count--;
         else params->source_code->implementations.functions.count--;
@@ -1046,6 +1055,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
   // For now we will focus only on oneline functions declarations/implementations
   // Also, we will ignore functions DECLARATIONS in source files
   while (*buffer == ' ') buffer++;
+  if (*buffer == '#') return 0;
 
   struct function_multiline_status_s * data;
   if ((data = malloc(sizeof(struct function_multiline_status_s))) == NULL) {
@@ -1054,6 +1064,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
     return 1;
   }
   status->data = data;
+  data->doubleptr = NULL;
   data->modifiers = 0;
   data->reading_arg = 0;
   data->reading_args = 0;
@@ -1221,7 +1232,7 @@ resume:
     return 0; // We matched something, so skip in the main loop
   }
   if (!data->reading_args && !data->reading_arg) {
-    register_function(path, args, status);
+    if (status->automatic) register_function(path, args, status);
     return 0;
   } else {
     status->reading_function_params = 1;
@@ -1318,7 +1329,7 @@ int try_extract_function_multiline(char * buffer, const char * path, callback_ar
       return 0;
     }
     status->data = data;
-    register_function(path, args, status);
+    if (status->automatic) register_function(path, args, status);
   }
   return 0;
 fail:
@@ -1333,11 +1344,18 @@ fail:
   free(data);\
   status->data = NULL;\
 }
-static void register_enum(const char * path, callback_args args, struct status_s * status) {
+void register_enum(const char * path, callback_args args, struct status_s * status) {
   struct enum_multiline_status_s * data = status->data;
 
   struct enum_spec * enumerator = NULL;
-  if (status->is_header) {
+  if (data->doubleptr != NULL) {
+    if ((*(data->doubleptr) = malloc(sizeof(struct enum_spec))) == NULL) {
+      perror("malloc enum_spec");
+      args->results.fails++;
+      return;
+    }
+    enumerator = *(data->doubleptr);
+  } else if (status->is_header) {
     if (args->source_code->definitions.enums.count == 0) {
       if ((args->source_code->definitions.enums.array = malloc(sizeof(struct enum_spec))) == NULL) {
         perror("malloc struct enum_spec");
@@ -1395,7 +1413,7 @@ static void register_enum(const char * path, callback_args args, struct status_s
 fail_with_free:
   if (enumerator->ref != NULL) free(enumerator->ref);
   if (enumerator->members != NULL) free(enumerator->members);
-  if (GET_ECOUNT(status->is_header, args->source_code) == 1) status->is_header ? free(args->source_code->definitions.enums.array) : free(args->source_code->implementations.enums.array);
+  if (data->doubleptr != NULL || GET_ECOUNT(status->is_header, args->source_code) == 1) status->is_header ? free(args->source_code->definitions.enums.array) : free(args->source_code->implementations.enums.array);
   if (status->is_header) args->source_code->definitions.enums.count--;
   else args->source_code->implementations.enums.count--;
   goto fail;
@@ -1415,6 +1433,80 @@ skip:
   SKIP_VOID(p);\
 }
 
+#define INCREMENT_RES(res, val, times) res = res * times + (long long int)val;
+static long long int parse_from_hex(char * input, size_t max) {
+  char is_negative = 0;
+  if (*input == '-') {
+    is_negative = 1;
+    input++;
+  } else if (*input == '+') input++;
+  input += 2;
+
+  long long int res = 0;
+  while (max > 0 && *input != 0) {
+    if (48 <= *input && *input <= 57) INCREMENT_RES(res, input - 48, 16)
+    else if (97 <= *input && *input <= 102) INCREMENT_RES(res, input - 97, 16)
+    else if (65 <= *input && *input <= 70) INCREMENT_RES(res, input - 65, 16)
+    max--;
+    input++;
+  }
+  return res * (is_negative == 1 ? -1 : 1);
+}
+static long long int parse_from_octal(char * input, size_t max) {
+  char is_negative = 0;
+  if (*input == '-') {
+    is_negative = 1;
+    input++;
+  } else if (*input == '+') input++;
+  input++;
+
+  long long int res = 0;
+  while (max > 0 && *input != 0) {
+    if (48 <= *input && *input <= 55) INCREMENT_RES(res, input - 48, 8);
+    max--;
+    input++;
+  }
+
+  return res * (is_negative ? -1 : 1);
+}
+static long long int parse_from_binary(char * input, size_t max) {
+  char is_negative = 0;
+  if (*input == '-') {
+    is_negative = 1;
+    input++;
+  } else if (*input == '+') input++;
+
+  long long int res = 0;
+  while (max > 0 && *input != 0) {
+    if (*input == 48 || *input == 49) INCREMENT_RES(res, input - 48, 2);
+    max--;
+    input++;
+  }
+
+  return res * (is_negative ? -1 : 1);
+}
+static void increment_number(char * input, char * outputbuf, size_t max) {
+  if (*input == '0' && *(input + 1) == 'x') { // We have to work with hexadecimal. Pray for us
+    long long int value = parse_from_hex(input, max);
+    snprintf(outputbuf, max, "0x%llx", value + 1);
+  } else if (*input == '0' && *(input + 1) == 'b') { // We have to work with binary
+    long long int value = parse_from_binary(input, max);
+    *outputbuf = '0';
+    *(outputbuf + 1) = 'b';
+    int index = 2;
+    while (value) {
+      if (value & 1) outputbuf[index++] = '1';
+      else outputbuf[index++] = '0';
+      value >>= 1;
+    }
+  } else if (*input == '0') { // We are working with octal
+    long long int value = parse_from_octal(input, max);
+    snprintf(outputbuf, max, "0%llo", value);
+  } else { // Decimal
+    long long int value = parse_llint(input, NULL);
+    snprintf(outputbuf, max, "%lld", value + 1);
+  }
+}
 static int register_enum_member(struct enum_multiline_status_s * data) {
   if (data->members_count == 0) {
     if ((data->members = malloc(sizeof(struct enum_member))) == NULL) {
@@ -1429,8 +1521,13 @@ static int register_enum_member(struct enum_multiline_status_s * data) {
   }
 
   data->value_buffer[data->value_buffer_index] = 0;
-  if (data->found_equal == 1) data->members[data->members_count].value = parse_llint(data->value_buffer, NULL);
-  else data->members[data->members_count].value = data->members_count == 0 ? 0 : data->members[data->members_count - 1].value + 1;
+  if (data->found_equal == 1) STRCP(data->value_buffer, data->members[data->members_count].value, ENTITIES_NAME_LENGTH, 1)
+  else {
+    if (data->members_count == 0) {
+      data->members[data->members_count].value[0] = '0';
+      data->members[data->members_count].value[1] = 0;
+    } else increment_number(data->members[data->members_count - 1].value, data->members[data->members_count].value, ENTITIES_NAME_LENGTH);
+  }
 
   data->member_name_buffer[data->member_name_index] = 0;
   STRCP(data->member_name_buffer, data->members[data->members_count].name, ENTITIES_NAME_LENGTH, 1);
@@ -1451,6 +1548,7 @@ int try_extract_enum(char * buffer, const char * path, callback_args args, struc
     args->results.fails++;
     return 1;
   }
+  data->doubleptr = NULL;
   data->modifiers = 0;
   data->members = NULL;
   data->starts_on_line = status->line_count;
@@ -1517,7 +1615,7 @@ did_checks: // From there, buffer is expected to be positionned at the beginning
   }
   if (*turtle == ';') { // Simple declaration of enumerator, telling the compiler that it exists
     status->data = data;
-    register_enum(path, args, status);
+    if (status->automatic) register_enum(path, args, status);
     return 1;
   }
 
@@ -1532,7 +1630,7 @@ did_checks: // From there, buffer is expected to be positionned at the beginning
         }
       }
       status->data = data;
-      register_enum(path, args, status);
+      if (status->automatic) register_enum(path, args, status);
       return 1;
     }
     if (*turtle == ',') {
@@ -1629,7 +1727,6 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
 #define FREE_ALL(data, status, td) {\
   if (data->buffer != NULL) free(data->buffer);\
   if (td != NULL && td->ref != NULL) free(td->ref);\
-  if (td != NULL && td->definition != NULL) free(td->definition);\
   free(data);\
   status->data = NULL;\
   status->reading_multiline_typedef = 0;\
@@ -1651,6 +1748,7 @@ static char * obtain_last_word_from_end(char * end) {
   if (*word == ')' || *word == '}') return word + 1;
   return word;
 }
+#define GET_TDCOUNT(header, code) ((header) ? (code->definitions.typedefs.count) : (code->implementations.typedefs.count))
 static int register_typedef(const char * path, callback_args args, struct status_s * status) {
   struct typedef_multiline_status_s * data = status->data;
 
@@ -1700,20 +1798,90 @@ static int register_typedef(const char * path, callback_args args, struct status
     args->results.fails++;
     return 1;
   }
+  td->definition.ptr = NULL;
+  td->definition.type = NoneType;
+  td->definition.pointers_level = 0;
+  td->definition.arrays.count = 0;
+  td->definition.arrays.array = NULL;
+  td->definition.string[0] = 0;
+  // Before anything : check if it is a function typedef. If so, get the name and keep it, and keep the entire function definition (including the name) so we can later on link it
+  int encountered_closing_parenthesis = 0;
+  char * cp = data->buffer;
+  while (*cp != 0 && *cp != ';') {
+    if (encountered_closing_parenthesis) {
+      if (*cp == ' ' || *cp == '\n') { // Just regular characters that could be between the final parenthesis and the end
+        cp++;
+        continue;
+      }
+      encountered_closing_parenthesis = 0; // Otherwise we reached something else : a letter, a pointer, anything, but that's not the end
+    } else if (*cp == ')') encountered_closing_parenthesis = 1;
+    cp++;
+  }
+  if (encountered_closing_parenthesis) { // This is unfortunately a function
+                                         // To locate the actual name, we will count until we have no more parenthesis pair (since it is how itw works)
+    int pending_pairs = 0;
+    int started_registering = 0;
+    int only_spaces = 1;
+    char * final_opening_parenthesis = NULL;
+    char * start_of_name = NULL;
+    while (cp > data->buffer && start_of_name == NULL) {
+      if (!started_registering) {
+        if (*cp == ')') {
+          started_registering = 1;
+          pending_pairs = 1;
+        }
+      } else if (pending_pairs > 0) {
+        if (*cp == ')') {
+          pending_pairs++;
+        } else if (*cp == '(') {
+          pending_pairs--;
+        }
+
+        if (pending_pairs == 0) final_opening_parenthesis = cp;
+      } else {
+        if (only_spaces && *cp != ' ') only_spaces = 0;
+        else if (!only_spaces && *cp == ' ') start_of_name = cp + 1;
+      }
+      cp--;
+    }
+    printf("\n");
+    if (start_of_name == NULL) {
+      fprintf(stderr, "Failed to parse function name for typedef.\n");
+      args->results.fails++;
+      if (GET_TDCOUNT(status->is_header, args->source_code) == 1) {
+        if (status->is_header) {
+          free(args->source_code->definitions.typedefs.array);
+          args->source_code->definitions.typedefs.array = NULL;
+        } else {
+          free(args->source_code->implementations.typedefs.array);
+          args->source_code->implementations.typedefs.array = NULL;
+        }
+      }
+      if (status->is_header) args->source_code->definitions.typedefs.count--;
+      else args->source_code->implementations.typedefs.count--;
+      FREE_ALL(data, status, td);
+      return 1;
+    }
+    *final_opening_parenthesis = 0;
+    STRCP(start_of_name, td->name, ENTITIES_NAME_LENGTH, 1);
+    *final_opening_parenthesis = '(';
+    td->is_function = 1;
+  } else {
+    td->is_function = 0;
+    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index); // In that case this is fine
+    STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
+  }
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
   td->ref->line = data->starts_on_line;
   td->modifiers = data->modifiers;
   STRCP((char *)path, td->ref->filename, PATH_MAX, 1);
-
-  char * name = obtain_last_word_from_end(data->buffer + data->buffer_index);
-  STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
-  td->definition = NULL;
 
   if (args->config->verbose_registration) printf("- Registering typedef %s\n", td->name);
 
   free(data);
   return 0;
 }
+#undef GET_TDCOUNT
 #undef FREE_IF_NEEDED
 #undef FREE_ALL
 #undef GET_TCOUNT

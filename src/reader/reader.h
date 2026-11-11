@@ -1,6 +1,7 @@
 #ifndef __READER_H__
 #define __READER_H__
 
+#include "../core/config.h"
 #include <linux/limits.h>
 
 #define ENTITIES_NAME_LENGTH 64
@@ -27,12 +28,16 @@ typedef struct reference * reference_t;
 
 // Type type
 typedef enum {
-  NoneType = 0,
-  StructureType = 1,
-  FunctionType = 2,
-  TypedefType = 3,
-  MacroType = 4,
-  PrimitiveType = 5
+  NoneType             = 0,
+  StructureType        = 1,
+  FunctionType         = 2,
+  TypedefType          = 3,
+  MacroType            = 4,
+  PrimitiveType        = 5,
+  EnumeratorType       = 6,
+  TypedefinedFunction  = 7,
+  TypedefinedStructure = 8,
+  TypedefinedEnum      = 9
 } TypeTypeIndicator;
 
 struct arrays_spec {
@@ -63,7 +68,7 @@ struct struct_spec {
 };
 struct enum_member {
   char name[ENTITIES_NAME_LENGTH];
-  long long int value;
+  char value[ENTITIES_NAME_LENGTH];
 };
 struct enum_members {
   ulint count;
@@ -79,8 +84,9 @@ struct typedef_spec {
   reference_t ref;
   char * buffer;
   char name[ENTITIES_NAME_LENGTH];
-  entity_type_t * definition;
+  entity_type_t definition;
   fnt_modifier modifiers;
+  char is_function;
 };
 struct function_arg {
   char name[ENTITIES_NAME_LENGTH];
@@ -145,9 +151,7 @@ typedef enum {
 struct primitive_spec {
   char name[ENTITIES_NAME_LENGTH];
   PrimitiveSource source;
-  char is_constant;
-  unsigned int pointers_level;
-  struct arrays_spec arrays;
+  char is_structure;
 };
 struct variable {
   reference_t ref;
@@ -213,5 +217,6 @@ void init_source_code(source_code_t);
 void free_source_code(source_code_t);
 int dump_source_code(const source_code_t, int fd);
 void summarise_parsing(source_code_t);
+void summarise_linking(const callback_args);
 
 #endif

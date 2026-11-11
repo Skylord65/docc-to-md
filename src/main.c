@@ -79,7 +79,8 @@ int main(int argc, char * argv[]) {
     .source_code = &(struct source_code){0},
     .results = (struct result){
       .success = 0,
-      .fails = 0
+      .fails = 0,
+      .links = 0
     }
   };
   init_source_code(callback_args.source_code);
@@ -99,6 +100,7 @@ int main(int argc, char * argv[]) {
   }
   if (args[7].found) summarise_parsing(callback_args.source_code);
   if (linkage(callback_args.source_code, &callback_args) != 0) {}
+  summarise_linking(&callback_args);
 
   dump(callback_args.source_code, args[5], args[6]);
 
