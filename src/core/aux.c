@@ -1416,6 +1416,80 @@ skip:
   SKIP_VOID(p);\
 }
 
+#define INCREMENT_RES(res, val, times) res = res * times + (long long int)val;
+static long long int parse_from_hex(char * input, size_t max) {
+  char is_negative = 0;
+  if (*input == '-') {
+    is_negative = 1;
+    input++;
+  } else if (*input == '+') input++;
+  input += 2;
+
+  long long int res = 0;
+  while (max > 0 && *input != 0) {
+    if (48 <= *input && *input <= 57) INCREMENT_RES(res, input - 48, 16)
+    else if (97 <= *input && *input <= 102) INCREMENT_RES(res, input - 97, 16)
+    else if (65 <= *input && *input <= 70) INCREMENT_RES(res, input - 65, 16)
+    max--;
+    input++;
+  }
+  return res * (is_negative == 1 ? -1 : 1);
+}
+static long long int parse_from_octal(char * input, size_t max) {
+  char is_negative = 0;
+  if (*input == '-') {
+    is_negative = 1;
+    input++;
+  } else if (*input == '+') input++;
+  input++;
+
+  long long int res = 0;
+  while (max > 0 && *input != 0) {
+    if (48 <= *input && *input <= 55) INCREMENT_RES(res, input - 48, 8);
+    max--;
+    input++;
+  }
+
+  return res * (is_negative ? -1 : 1);
+}
+static long long int parse_from_binary(char * input, size_t max) {
+  char is_negative = 0;
+  if (*input == '-') {
+    is_negative = 1;
+    input++;
+  } else if (*input == '+') input++;
+
+  long long int res = 0;
+  while (max > 0 && *input != 0) {
+    if (*input == 48 || *input == 49) INCREMENT_RES(res, input - 48, 2);
+    max--;
+    input++;
+  }
+
+  return res * (is_negative ? -1 : 1);
+}
+static void increment_number(char * input, char * outputbuf, size_t max) {
+  if (*input == '0' && *(input + 1) == 'x') { // We have to work with hexadecimal. Pray for us
+    long long int value = parse_from_hex(input, max);
+    snprintf(outputbuf, max, "0x%llx", value + 1);
+  } else if (*input == '0' && *(input + 1) == 'b') { // We have to work with binary
+    long long int value = parse_from_binary(input, max);
+    *outputbuf = '0';
+    *(outputbuf + 1) = 'b';
+    int index = 2;
+    while (value) {
+      if (value & 1) outputbuf[index++] = '1';
+      else outputbuf[index++] = '0';
+      value >>= 1;
+    }
+  } else if (*input == '0') { // We are working with octal
+    long long int value = parse_from_octal(input, max);
+    snprintf(outputbuf, max, "0%llo", value);
+  } else { // Decimal
+    long long int value = parse_llint(input, NULL);
+    snprintf(outputbuf, max, "%lld", value + 1);
+  }
+}
 static int register_enum_member(struct enum_multiline_status_s * data) {
   if (data->members_count == 0) {
     if ((data->members = malloc(sizeof(struct enum_member))) == NULL) {
@@ -1430,8 +1504,13 @@ static int register_enum_member(struct enum_multiline_status_s * data) {
   }
 
   data->value_buffer[data->value_buffer_index] = 0;
-  if (data->found_equal == 1) data->members[data->members_count].value = parse_llint(data->value_buffer, NULL);
-  else data->members[data->members_count].value = data->members_count == 0 ? 0 : data->members[data->members_count - 1].value + 1;
+  if (data->found_equal == 1) STRCP(data->value_buffer, data->members[data->members_count].value, ENTITIES_NAME_LENGTH, 1)
+  else {
+    if (data->members_count == 0) {
+      data->members[data->members_count].value[0] = '0';
+      data->members[data->members_count].value[1] = 0;
+    } else increment_number(data->members[data->members_count - 1].value, data->members[data->members_count].value, ENTITIES_NAME_LENGTH);
+  }
 
   data->member_name_buffer[data->member_name_index] = 0;
   STRCP(data->member_name_buffer, data->members[data->members_count].name, ENTITIES_NAME_LENGTH, 1);

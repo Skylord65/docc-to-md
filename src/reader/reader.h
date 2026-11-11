@@ -65,7 +65,7 @@ struct struct_spec {
 };
 struct enum_member {
   char name[ENTITIES_NAME_LENGTH];
-  long long int value;
+  char value[ENTITIES_NAME_LENGTH];
 };
 struct enum_members {
   ulint count;

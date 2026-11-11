@@ -258,8 +258,8 @@ static void dump_enum(ARGS_T, struct enum_spec * enumerator) {
   DUMP("/Enumerator %s\nDefined in %s:%lu\nenum {", enumerator->name, enumerator->ref->filename, enumerator->ref->line);
   ulint j = 0;
   while (j < enumerator->members->count) {
-    if (j == enumerator->members->count - 1) DUMP("  %s = %lld", enumerator->members->array[j].name, enumerator->members->array[j].value)
-    else DUMP("  %s = %lld%c", enumerator->members->array[j].name, enumerator->members->array[j].value, ',');
+    if (j == enumerator->members->count - 1) DUMP("  %s = %s", enumerator->members->array[j].name, enumerator->members->array[j].value)
+    else DUMP("  %s = %s%c", enumerator->members->array[j].name, enumerator->members->array[j].value, ',');
     j++;
   }
   DUMP("}");
