@@ -1651,6 +1651,7 @@ static char * obtain_last_word_from_end(char * end) {
   if (*word == ')' || *word == '}') return word + 1;
   return word;
 }
+#define GET_TDCOUNT(header, code) ((header) ? (code->definitions.typedefs.count) : (code->implementations.typedefs.count))
 static int register_typedef(const char * path, callback_args args, struct status_s * status) {
   struct typedef_multiline_status_s * data = status->data;
 
@@ -1700,20 +1701,85 @@ static int register_typedef(const char * path, callback_args args, struct status
     args->results.fails++;
     return 1;
   }
+  td->definition = NULL;
+  // Before anything : check if it is a function typedef. If so, get the name and keep it, and keep the entire function definition (including the name) so we can later on link it
+  int encountered_closing_parenthesis = 0;
+  char * cp = data->buffer;
+  while (*cp != 0 && *cp != ';') {
+    if (encountered_closing_parenthesis) {
+      if (*cp == ' ' || *cp == '\n') { // Just regular characters that could be between the final parenthesis and the end
+        cp++;
+        continue;
+      }
+      encountered_closing_parenthesis = 0; // Otherwise we reached something else : a letter, a pointer, anything, but that's not the end
+    } else if (*cp == ')') encountered_closing_parenthesis = 1;
+    cp++;
+  }
+  if (encountered_closing_parenthesis) { // This is unfortunately a function
+                                         // To locate the actual name, we will count until we have no more parenthesis pair (since it is how itw works)
+    int pending_pairs = 0;
+    int started_registering = 0;
+    int only_spaces = 1;
+    char * final_opening_parenthesis = NULL;
+    char * start_of_name = NULL;
+    while (cp > data->buffer && start_of_name == NULL) {
+      if (!started_registering) {
+        if (*cp == ')') {
+          started_registering = 1;
+          pending_pairs = 1;
+        }
+      } else if (pending_pairs > 0) {
+        if (*cp == ')') {
+          pending_pairs++;
+        } else if (*cp == '(') {
+          pending_pairs--;
+        }
+
+        if (pending_pairs == 0) final_opening_parenthesis = cp;
+      } else {
+        if (only_spaces && *cp != ' ') only_spaces = 0;
+        else if (!only_spaces && *cp == ' ') start_of_name = cp + 1;
+      }
+      cp--;
+    }
+    printf("\n");
+    if (start_of_name == NULL) {
+      fprintf(stderr, "Failed to parse function name for typedef.\n");
+      args->results.fails++;
+      if (GET_TDCOUNT(status->is_header, args->source_code) == 1) {
+        if (status->is_header) {
+          free(args->source_code->definitions.typedefs.array);
+          args->source_code->definitions.typedefs.array = NULL;
+        } else {
+          free(args->source_code->implementations.typedefs.array);
+          args->source_code->implementations.typedefs.array = NULL;
+        }
+      }
+      if (status->is_header) args->source_code->definitions.typedefs.count--;
+      else args->source_code->implementations.typedefs.count--;
+      FREE_ALL(data, status, td);
+      return 1;
+    }
+    *final_opening_parenthesis = 0;
+    STRCP(start_of_name, td->name, ENTITIES_NAME_LENGTH, 1);
+    *final_opening_parenthesis = '(';
+    td->is_function = 1;
+  } else {
+    td->is_function = 0;
+    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index); // In that case this is fine
+    STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
+  }
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
   td->ref->line = data->starts_on_line;
   td->modifiers = data->modifiers;
   STRCP((char *)path, td->ref->filename, PATH_MAX, 1);
-
-  char * name = obtain_last_word_from_end(data->buffer + data->buffer_index);
-  STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
-  td->definition = NULL;
 
   if (args->config->verbose_registration) printf("- Registering typedef %s\n", td->name);
 
   free(data);
   return 0;
 }
+#undef GET_TDCOUNT
 #undef FREE_IF_NEEDED
 #undef FREE_ALL
 #undef GET_TCOUNT

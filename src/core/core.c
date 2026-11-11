@@ -194,8 +194,8 @@ void recursion_callback(const char * src, callback_args params) {
     else {
       if (try_extract_macro(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_struct(buffer, src, params, &status) == 0) goto last_bit;
+      if (try_extract_typedef(buffer, src, params, &status) == 0) goto last_bit; // Make sure that typedefs are before functions
       if (try_extract_function(buffer, src, params, &status) == 0) goto last_bit;
-      if (try_extract_typedef(buffer, src, params, &status) == 0) goto last_bit;
       if (try_extract_enum(buffer, src, params, &status) == 0) goto last_bit;
       if (status.is_header && try_extract_variable(buffer, src, params, &status) == 0) goto last_bit;
     }
