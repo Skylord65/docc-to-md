@@ -1,0 +1,47 @@
+name: Notify on Discord webhook of merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  send-webhook:
+    if: github.event.pull_request.merged == true
+    runs-on: arch
+    steps:
+      - name: create-description
+        id: description
+        env:
+          URL: ${{ github.server_url }}/${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SERVER: ${{ github.server_url }}
+          CREATOR_NAME: ${{ github.event.pull_request.user.login }}
+          MERGER_NAME: ${{ github.event.pull_request.merged_by.login }}
+          FROM_BRANCH: ${{ github.event.pull_request.head_ref }}
+          INTO_BRANCH: ${{ github.event.pull_request.base_ref }}
+          COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          touch description.md
+          MD_FILE="$( realpath description.md )"
+          echo "file=$MD_FILE" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "A [pull request](${URL}/pulls/${PR_NUMBER}) created by [**${CREATOR_NAME}**](${SERVER}/${CREATOR_NAME}**) has been merged by [**${MERGER_NAME}**](${SERVER}/${MERGER_NAME})"
+            echo ""
+            echo "From [`${FROM_BRANCH}`](${URL}/src/branch/${FROM_BRANCH}) into [`${INTO_BRANCH}`](${URL}/src/branch/${INTO_BRANCH})"
+            echo "Merged in [commit `${COMMIT}`](${URL}/commit/${COMMIT})"
+          } >> "$MD_FILE"
+
+          cat "$MD_FILE"
+
+      - name: send-data
+        uses: ./.forgejo/actions/discord-notify
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          bot_name: ${{ github.repository }}
+          bot_avatar_url: 'https://git.greensky.tf/Greensky/assets/raw/commit/82192bec488323e1c988f38d9043b71e1aed0f88/icons/git/git-merged.png'
+          title_url: ${{ github.server_url }}/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
+          title: ${{ github.event.pull_request.title }}
+          color: '65300'
+          description_file: ${{ steps.description.outputs.file }}
