@@ -865,7 +865,7 @@ incomplete:
   free(data);\
   status->data = NULL;\
 }
-static void register_function(const char * path, callback_args params, struct status_s * status) {
+void register_function(const char * path, callback_args params, struct status_s * status) {
   struct function_multiline_status_s * data = status->data;
   // Do some checks before registering, like keywords that could have a parenthesis "if"
   if (streq_with_crumb(data->name, "if", ' ')) {
@@ -874,7 +874,14 @@ static void register_function(const char * path, callback_args params, struct st
   }
 
   struct function_spec * function;
-  if (status->is_header) {
+  if (data->doubleptr != NULL) {
+    if ((*(data->doubleptr) = malloc(sizeof(struct function_spec))) == NULL) {
+      perror("malloc struct function_specs");
+      params->results.fails++;
+      return;
+    }
+    function = *(data->doubleptr);
+  } else if (status->is_header) {
     if (params->source_code->definitions.functions.count == 0) {
       if ((params->source_code->definitions.functions.array = malloc(sizeof(struct function_spec))) == NULL) {
         perror("malloc struct function_spec");
@@ -911,15 +918,17 @@ static void register_function(const char * path, callback_args params, struct st
   }
   if ((function->ref = malloc(sizeof(struct reference))) == NULL) {
     perror("malloc function->ref");
-    if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
+    if (data->doubleptr != NULL || GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
     FREE_DATA(status, data);
+    params->results.fails++;
     return;
   }
   if ((function->args = malloc(sizeof(struct function_args))) == NULL) {
     perror("malloc function->args");
     free(function->ref);
-    if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
+    if (data->doubleptr != NULL || GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
     FREE_DATA(status, data);
+    params->results.fails++;
     return;
   }
   function->args->count = data->args_count;
@@ -952,7 +961,7 @@ almost_complete_fail:
         free(function->ref);
         free(function->args->array);
         free(function->args);
-        if (GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
+        if (data->doubleptr != NULL || GET_FCOUNT(status->is_header, params->source_code) == 1) free(function);
         FREE_DATA(status, data);
         if (status->is_header) params->source_code->definitions.functions.count--;
         else params->source_code->implementations.functions.count--;
@@ -1055,6 +1064,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
     return 1;
   }
   status->data = data;
+  data->doubleptr = NULL;
   data->modifiers = 0;
   data->reading_arg = 0;
   data->reading_args = 0;
@@ -1222,7 +1232,7 @@ resume:
     return 0; // We matched something, so skip in the main loop
   }
   if (!data->reading_args && !data->reading_arg) {
-    register_function(path, args, status);
+    if (status->automatic) register_function(path, args, status);
     return 0;
   } else {
     status->reading_function_params = 1;
@@ -1319,7 +1329,7 @@ int try_extract_function_multiline(char * buffer, const char * path, callback_ar
       return 0;
     }
     status->data = data;
-    register_function(path, args, status);
+    if (status->automatic) register_function(path, args, status);
   }
   return 0;
 fail:
@@ -1709,7 +1719,6 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
 #define FREE_ALL(data, status, td) {\
   if (data->buffer != NULL) free(data->buffer);\
   if (td != NULL && td->ref != NULL) free(td->ref);\
-  if (td != NULL && td->definition != NULL) free(td->definition);\
   free(data);\
   status->data = NULL;\
   status->reading_multiline_typedef = 0;\
@@ -1781,7 +1790,12 @@ static int register_typedef(const char * path, callback_args args, struct status
     args->results.fails++;
     return 1;
   }
-  td->definition = NULL;
+  td->definition.ptr = NULL;
+  td->definition.type = NoneType;
+  td->definition.pointers_level = 0;
+  td->definition.arrays.count = 0;
+  td->definition.arrays.array = NULL;
+  td->definition.string[0] = 0;
   // Before anything : check if it is a function typedef. If so, get the name and keep it, and keep the entire function definition (including the name) so we can later on link it
   int encountered_closing_parenthesis = 0;
   char * cp = data->buffer;

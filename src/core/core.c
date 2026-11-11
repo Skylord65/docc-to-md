@@ -180,6 +180,7 @@ void recursion_callback(const char * src, callback_args params) {
     .reading_multiline_typedef = 0,
     .line_count = 1,
     .data = NULL,
+    .automatic = 1
   };
 
   char buffer[LINE_BUFFER_SIZE];

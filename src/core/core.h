@@ -42,6 +42,7 @@ struct status_s {
   int reading_multiline_struct;
   int reading_multiline_enum;
   int reading_multiline_typedef;
+  int automatic;
 
   unsigned long long int line_count;
   void * data;
@@ -63,6 +64,7 @@ struct struct_multiline_status_s {
   int reading_members;
   int reading_member;
   ulint members_count;
+  struct struct_spec ** doubleptr;
   char ** members_array; // Store them as string, keep the computing when we are sure it is complete
 };
 struct function_multiline_status_s {
@@ -79,6 +81,7 @@ struct function_multiline_status_s {
   int is_declaration;
   char multiline_parameter_buffer[ENTITIES_NAME_LENGTH * 2];
   unsigned int parameter_index;
+  struct function_spec ** doubleptr;
 };
 struct enum_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
@@ -91,6 +94,7 @@ struct enum_multiline_status_s {
   unsigned short int value_buffer_index;
   char found_equal;
   char value_buffer[ENTITIES_NAME_LENGTH];
+  struct enum_spec ** doubleptr;
 };
 struct typedef_multiline_status_s {
   ulint starts_on_line;
@@ -115,4 +119,6 @@ extern int try_extract_typedef_multiline(char * buffer, const char * path, callb
 
 extern int linkage(source_code_t code, callback_args args);
 
+// Some registering functions
+void register_function(const char * path, callback_args params, struct status_s * status);
 #endif
