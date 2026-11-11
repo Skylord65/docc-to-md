@@ -19,7 +19,7 @@ jobs:
 
     defaults:
       run:
-        shell: ${{ matrix.os == 'windows-latest' && 'powershell -NoLogo -NoProfile -Command "& ''C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1'' -Arch amd64 -SkipAutomaticLocation; & ''{0}''; exit $LASTEXITCODE"' || 'bash' }}
+        shell: ${{ matrix.os == 'windows-latest' && 'powershell' || 'bash' }}
     
     steps:
       - name: Checkout repository
@@ -76,6 +76,19 @@ jobs:
           elif [ "$status" -ne 0 ]; then
             exit "$status"
           fi
+
+      - name: Setup MSVC environment
+        if: matrix.os == 'windows-latest'
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vcvars = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+              Add-Content -Path $env:GITHUB_ENV -Value "$($matches[1])=$($matches[2])"
+            }
+          }
+          where.exe cl
 
       - name: Modify makefile (Windows)
 
