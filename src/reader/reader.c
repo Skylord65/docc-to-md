@@ -73,7 +73,7 @@ static void free_variables(struct variables_indic * variables) {
   free(variables->array);
 }
 static void free_function(struct function_spec * function) {
-  if (function->args->count > 0 && function->args->array != NULL) {
+  if (function->args != NULL && function->args->count > 0 && function->args->array != NULL) {
     ulint i = 0;
     while (i < function->args->count) {
       free_type(&(function->args->array[i].type));
@@ -111,10 +111,17 @@ static void free_enums(struct enum_indic * enumerators) {
 }
 static void free_typedef(struct typedef_spec * td) {
   if (td->ref != NULL) free(td->ref);
-  if (td->definition != NULL) {
-    free_type(td->definition);
-    free(td->definition);
+  if (td->definition.type == TypedefinedStructure) {
+    free_structure(td->definition.ptr);
+    free(td->definition.ptr);
+  } else if (td->definition.type == TypedefinedEnum) {
+    free_enum(td->definition.ptr);
+    free(td->definition.ptr);
+  } else if (td->definition.type == TypedefinedFunction) {
+    free_function(td->definition.ptr);
+    free(td->definition.ptr);
   }
+  free_type(&(td->definition));
   if (td->buffer != NULL) free(td->buffer);
 }
 static void free_typedefs(struct typedef_indic * tds) {

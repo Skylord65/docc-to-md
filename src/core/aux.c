@@ -1344,11 +1344,18 @@ fail:
   free(data);\
   status->data = NULL;\
 }
-static void register_enum(const char * path, callback_args args, struct status_s * status) {
+void register_enum(const char * path, callback_args args, struct status_s * status) {
   struct enum_multiline_status_s * data = status->data;
 
   struct enum_spec * enumerator = NULL;
-  if (status->is_header) {
+  if (data->doubleptr != NULL) {
+    if ((*(data->doubleptr) = malloc(sizeof(struct enum_spec))) == NULL) {
+      perror("malloc enum_spec");
+      args->results.fails++;
+      return;
+    }
+    enumerator = *(data->doubleptr);
+  } else if (status->is_header) {
     if (args->source_code->definitions.enums.count == 0) {
       if ((args->source_code->definitions.enums.array = malloc(sizeof(struct enum_spec))) == NULL) {
         perror("malloc struct enum_spec");
@@ -1406,7 +1413,7 @@ static void register_enum(const char * path, callback_args args, struct status_s
 fail_with_free:
   if (enumerator->ref != NULL) free(enumerator->ref);
   if (enumerator->members != NULL) free(enumerator->members);
-  if (GET_ECOUNT(status->is_header, args->source_code) == 1) status->is_header ? free(args->source_code->definitions.enums.array) : free(args->source_code->implementations.enums.array);
+  if (data->doubleptr != NULL || GET_ECOUNT(status->is_header, args->source_code) == 1) status->is_header ? free(args->source_code->definitions.enums.array) : free(args->source_code->implementations.enums.array);
   if (status->is_header) args->source_code->definitions.enums.count--;
   else args->source_code->implementations.enums.count--;
   goto fail;
@@ -1541,6 +1548,7 @@ int try_extract_enum(char * buffer, const char * path, callback_args args, struc
     args->results.fails++;
     return 1;
   }
+  data->doubleptr = NULL;
   data->modifiers = 0;
   data->members = NULL;
   data->starts_on_line = status->line_count;
@@ -1607,7 +1615,7 @@ did_checks: // From there, buffer is expected to be positionned at the beginning
   }
   if (*turtle == ';') { // Simple declaration of enumerator, telling the compiler that it exists
     status->data = data;
-    register_enum(path, args, status);
+    if (status->automatic) register_enum(path, args, status);
     return 1;
   }
 
@@ -1622,7 +1630,7 @@ did_checks: // From there, buffer is expected to be positionned at the beginning
         }
       }
       status->data = data;
-      register_enum(path, args, status);
+      if (status->automatic) register_enum(path, args, status);
       return 1;
     }
     if (*turtle == ',') {

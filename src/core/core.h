@@ -121,4 +121,6 @@ extern int linkage(source_code_t code, callback_args args);
 
 // Some registering functions
 void register_function(const char * path, callback_args params, struct status_s * status);
+void register_enum(const char * path, callback_args args, struct status_s * status);
+
 #endif

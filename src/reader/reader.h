@@ -28,13 +28,16 @@ typedef struct reference * reference_t;
 
 // Type type
 typedef enum {
-  NoneType = 0,
-  StructureType = 1,
-  FunctionType = 2,
-  TypedefType = 3,
-  MacroType = 4,
-  PrimitiveType = 5,
-  EnumeratorType = 6
+  NoneType             = 0,
+  StructureType        = 1,
+  FunctionType         = 2,
+  TypedefType          = 3,
+  MacroType            = 4,
+  PrimitiveType        = 5,
+  EnumeratorType       = 6,
+  TypedefinedFunction  = 7,
+  TypedefinedStructure = 8,
+  TypedefinedEnum      = 9
 } TypeTypeIndicator;
 
 struct arrays_spec {
@@ -81,7 +84,7 @@ struct typedef_spec {
   reference_t ref;
   char * buffer;
   char name[ENTITIES_NAME_LENGTH];
-  entity_type_t * definition;
+  entity_type_t definition;
   fnt_modifier modifiers;
   char is_function;
 };

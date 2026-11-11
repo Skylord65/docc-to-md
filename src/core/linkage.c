@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -213,8 +214,7 @@ static struct primitive_spec * try_parse_primitive_structure(char * input, sourc
  *
  * It DOES NOT call register_primitive
  */
-static int try_parse_primitive(char * input, struct register_primitive_data * data, char ** restptr, int * failed) {
-  *failed = 0;
+static int try_parse_primitive(char * input, struct register_primitive_data * data, char ** restptr) {
   if (starts_with(input, "const")) {
     data->is_constant = 1;
     GOTO_NEXTWORD(input);
@@ -312,7 +312,6 @@ static void init_primitive_data(struct register_primitive_data * p) {
   p->buffer[0] = 0;
 }
 static int assign_type(source_code_t code, char * input, entity_type_t * type) {
-  int failed;
   struct register_primitive_data data;
 
   init_primitive_data(&data);
@@ -334,7 +333,7 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
       return 1;
     }
     return 0;
-  } else if (try_parse_primitive(input, &data, &input_rest, &failed) == 0) {
+  } else if (try_parse_primitive(input, &data, &input_rest) == 0) {
     if (compute_rest_of_type(input_rest, type) != 0) return 1;
 
     // Find the already registered primitive if it exists
@@ -357,8 +356,7 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
     // The added primitive is automatically the last
     type->ptr = code->primitives.array + (code->primitives.count - 1);
     type->type = PrimitiveType;
-  } else if (failed) {
-    fprintf(stderr, "Cannot continue after encountering critical error\n");
+  } else {
     return 1;
   }
 
@@ -376,6 +374,8 @@ static int link_functions(struct function_indic * functions, source_code_t code,
 
     ulint j = 0;
     while (j < function->args->count) {
+      // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the name of the argument is set to struct or enum
+      // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
       if (assign_type(code, function->args->array[j].type.string, &(function->args->array[j].type)) != 0) {
         fprintf(stderr, "Cannot assign type of argument number %lu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, function->args->array[j].name, function->args->array[j].type.string);
         args->results.fails++;
@@ -421,11 +421,97 @@ static int link_variables(struct variables_indic * variables, source_code_t code
   args->results.links += variables->count;
   return 0;
 }
+/**
+ * Here we may want to not throw errors on type not assigned, we will assume that is because it is a typedefined into the typedef, like 
+ * typedef enum {
+ *  A,
+ *  B
+ * }; or with structures
+ *
+ * We want to assign them if the types exists and are like pointers, like :
+ * struct filestream;
+ * typedef struct filestream * stream_p;
+ *
+ * TODO : also link the resulting types
+ */
+static int link_typedef(struct typedef_spec * td, source_code_t code, callback_args args) {
+  if (td->is_function) { // Don't search, just parse it somehow
+    struct status_s status = {
+      .reading_function_params = 0,
+      .data = NULL,
+      .automatic = 0
+    };
+    if (try_extract_function(td->buffer, "", args, &status) == 0 && status.data == NULL) {
+      fprintf(stderr, "Cannot parse function type of %s for typedef %s\n", td->buffer, td->name);
+      args->results.fails++;
+      return 1;
+    }
+
+    ((struct function_multiline_status_s *)(status.data))->doubleptr = (struct function_spec **)(&td->definition.ptr);
+    long long int before = args->results.fails;
+    register_function("", args, &status);
+    if (args->results.fails > before) {
+      fprintf(stderr, "Failed to register function %s for typedef %s\n", td->buffer, td->name);
+      args->results.fails++;
+      return 1;
+    }
+
+    args->results.links++;
+    td->definition.type = TypedefinedFunction;
+    return 0;
+  }
+  // First check if it could be defined here : a keyword followed by something else than {
+  char * ptr = td->buffer;
+  if (word_eq(ptr, "typedef")) GOTO_NEXTWORD(ptr);
+  DEBUG("Working on " DBG_RED "%s", td->buffer);
+  if (word_eq(ptr, "enum")) {
+    DEBUG("Starting enum");
+    GOTO_NEXTWORD(td->buffer);
+    if (*ptr != '{') { // Here we go and try
+      struct status_s status = {
+        .reading_multiline_enum = 0,
+        .data = NULL,
+        .automatic = 0
+      };
+      if (try_extract_enum(td->buffer, "", args, &status) == 0 && status.data == NULL) {
+        fprintf(stderr, "Cannot parse enumerator type of %s for typedef %s\n", td->buffer, td->name);
+        args->results.fails++;
+        return 1;
+      }
+
+      ((struct enum_multiline_status_s *)(status.data))->doubleptr = (struct enum_spec **)(&td->definition.ptr);
+      long long int before = args->results.fails;
+      register_enum("", args, &status);
+      if (args->results.fails > before) {
+        fprintf(stderr, "Failed to register enum type %s for typedef %s\n", td->buffer, td->name);
+        args->results.fails++;
+        return 1;
+      }
+
+      args->results.links++;
+      td->definition.type = TypedefinedEnum;
+      return 0;
+    }
+  }
+  td->definition.type = NoneType;
+
+  return 0;
+}
+static int link_typedefs(struct typedef_indic * typedefs, source_code_t code, callback_args args) {
+  ulint i = 0;
+  while (i < typedefs->count) {
+    link_typedef(typedefs->array + i, code, args);
+    i++;
+  }
+  return 0;
+}
 int linkage(source_code_t code, callback_args args) {
   link_functions(&(code->definitions.functions), code, args);
   link_functions(&(code->implementations.functions), code, args);
   link_structs(&(code->definitions.structs), code, args);
   link_structs(&(code->implementations.structs), code, args);
+  link_typedefs(&(code->definitions.typedefs), code, args);
+  link_typedefs(&(code->implementations.typedefs), code, args);
   link_variables(&(code->definitions.variables), code, args);
   return 0;
 }
