@@ -15,16 +15,23 @@ jobs:
         include:
           - os: windows-latest
           - os: arch
-    runs-on: arch
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: ${{ matrix.os == 'windows-latest' && 'pwsh -NoLogo -NoProfile -Command "& ''C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1'' -Arch amd64 -SkipAutomaticLocation; {0}"' || 'bash' }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies
+        if: matrix.os != 'windows-latest'
         run: |
           sudo pacman -Sy --noconfirm time
 
       - name: Modify makefile
+        if: matrix.os != 'windows-latest'
         run: |
           set -euo pipefail
 
@@ -35,12 +42,14 @@ jobs:
           cat makefile
 
       - name: Compile and see
+        if: matrix.os != 'windows-latest'
         run: |
           make DEBUG=1
           make clean
           make cleanbuild DEBUG=1
 
       - name: Check program against itself
+        if: matrix.os != 'windows-latest'
         run: |
           set -euo pipefail
 
@@ -67,3 +76,67 @@ jobs:
           elif [ "$status" -ne 0 ]; then
             exit "$status"
           fi
+
+      - name: Modify makefile (Windows)
+
+        if: matrix.os == 'windows-latest'
+        run: |
+          $ErrorActionPreference = "Stop"
+          $content = Get-Content makefile -Raw
+          # Équivalent MSVC de -Werror (/WX) et suppression de -DNODEBUG
+          $content = $content -replace '(FLAGS=.*)', '$1 /WX'
+          $content = $content -replace '(CLEANBUILD_FLAGS=.*)', '$1 /WX'
+          $content = $content -replace ' \?-DNODEBUG', ''
+          Set-Content makefile $content
+          Get-Content makefile
+
+      - name: Compile and see (Windows)
+
+        if: matrix.os == 'windows-latest'
+        run: |
+          $ErrorActionPreference = "Stop"
+          # Utilise nmake (natif MSVC) ou make si installé sur votre runner
+          nmake DEBUG=1
+          nmake clean
+          nmake cleanbuild DEBUG=1
+
+      - name: Check program against itself (Windows)
+        
+        if: matrix.os == 'windows-latest'
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Host "Testing program with all possible arguments against itself"
+          
+          $argsList = @(
+            "--src", "src",
+            "--dest", "test/out",
+            "-d",
+            "--dump", "test/dump",
+            "--verbose-registration",
+            "--enable-commentdoc",
+            "--work", "test/work"
+          )
+
+          # Exécution avec suivi du pic mémoire et timeout de 5 minutes (300000 ms)
+          $proc = Start-Process -FilePath ".\bin\main.uwu.exe" -ArgumentList $argsList -NoNewWindow -PassThru
+          $peakBytes = 0
+
+          while (-not $proc.HasExited) {
+            $proc.Refresh()
+            if ($proc.PeakWorkingSet64 -gt $peakBytes) {
+              $peakBytes = $proc.PeakWorkingSet64
+            }
+            if ((New-TimeSpan -Start $proc.StartTime).TotalMinutes -ge 5) {
+              Stop-Process -Id $proc.Id -Force
+              Write-Host "::error::Program exceeded the 5 minute limit and was interrupted."
+              exit 124
+            }
+            Start-Sleep -Milliseconds 100
+          }
+
+          $peakKiB = [math]::Round($peakBytes / 1024)
+          Write-Host "Peak RAM: $peakKiB KiB"
+
+          if ($proc.ExitCode -ne 0) {
+            exit $proc.ExitCode
+          }
