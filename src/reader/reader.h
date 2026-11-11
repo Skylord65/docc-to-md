@@ -111,20 +111,20 @@ struct macro_spec {
   reference_t ref;
 };
 typedef enum {
-  GlibC          = 0x00000000000001,
-  Stdio          = 0x00000000000010,
-  Stdbool        = 0x00000000000100,
-  Stdint         = 0x00000000001000,
-  Unistd         = 0x00000000010000,
-  Fcntl          = 0x00000000100000,
-  SysStat        = 0x00000001000000,
-  SysDir         = 0x00000010000000,
-  LibStringpGrep = 0x00000100000000,
-  Stdtime        = 0x00001000000000,
-  Stddef         = 0x00010000000000,
-  SysTypes       = 0x00100000000000,
-  Stdlib         = 0x01000000000000,
-  Dirent         = 0x10000000000000,
+  GlibC          = 0b00000000000001,
+  Stdio          = 0b00000000000010,
+  Stdbool        = 0b00000000000100,
+  Stdint         = 0b00000000001000,
+  Unistd         = 0b00000000010000,
+  Fcntl          = 0b00000000100000,
+  SysStat        = 0b00000001000000,
+  SysDir         = 0b00000010000000,
+  LibStringpGrep = 0b00000100000000,
+  Stdtime        = 0b00001000000000,
+  Stddef         = 0b00010000000000,
+  SysTypes       = 0b00100000000000,
+  Stdlib         = 0b01000000000000,
+  Dirent         = 0b10000000000000,
 } PrimitiveSource;
 
 #define P_TGLIBC(x) ((x & GlibC) == GlibC)
