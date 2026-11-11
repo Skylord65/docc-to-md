@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: create-description
+      - name: Create description
         id: description
         env:
           URL: ${{ github.server_url }}/${{ github.repository }}
@@ -21,20 +21,27 @@ jobs:
           SERVER: ${{ github.server_url }}
           CREATOR_NAME: ${{ github.event.pull_request.user.login }}
           MERGER_NAME: ${{ github.event.pull_request.merged_by.login }}
-          FROM_BRANCH: ${{ github.event.pull_request.head_ref }}
-          INTO_BRANCH: ${{ github.event.pull_request.base_ref }}
+          FROM_BRANCH: ${{ github.event.pull_request.head.ref }}
+          INTO_BRANCH: ${{ github.event.pull_request.base.ref }}
           COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
-          touch description.md
-          MD_FILE="$( realpath description.md )"
+          MD_FILE="$(realpath description.md)"
           echo "file=$MD_FILE" >> "$GITHUB_OUTPUT"
 
           {
-            echo "A [pull request](${URL}/pulls/${PR_NUMBER}) created by [**${CREATOR_NAME}**](${SERVER}/${CREATOR_NAME}**) has been merged by [**${MERGER_NAME}**](${SERVER}/${MERGER_NAME})"
-            echo ""
-            echo "From [`${FROM_BRANCH}`](${URL}/src/branch/${FROM_BRANCH}) into [`${INTO_BRANCH}`](${URL}/src/branch/${INTO_BRANCH})"
-            echo "Merged in [commit `${COMMIT}`](${URL}/commit/${COMMIT})"
-          } >> "$MD_FILE"
+            printf 'A [pull request](%s/pulls/%s) created by [**%s**](%s/%s) has been merged by [**%s**](%s/%s)\n' \
+              "$URL" "$PR_NUMBER" "$CREATOR_NAME" "$SERVER" "$CREATOR_NAME" \
+              "$MERGER_NAME" "$SERVER" "$MERGER_NAME"
+
+            printf '\n'
+
+            printf 'From [`%s`](%s/src/branch/%s) into [`%s`](%s/src/branch/%s)\n' \
+              "$FROM_BRANCH" "$URL" "$FROM_BRANCH" \
+              "$INTO_BRANCH" "$URL" "$INTO_BRANCH"
+
+            printf 'Merged in [commit `%s`](%s/commit/%s)\n' \
+              "$COMMIT" "$URL" "$COMMIT"
+          } > "$MD_FILE"
 
           cat "$MD_FILE"
 
