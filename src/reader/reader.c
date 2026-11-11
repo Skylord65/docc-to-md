@@ -293,9 +293,9 @@ static void dump_typedefs(ARGS_T, struct typedef_indic * indic) {
 static void dump_primitive(ARGS_T, struct primitive_spec * primitive) {
   char namebuf[ENTITIES_NAME_LENGTH * 2];
   int index = 0;
-  if (primitive->is_constant) {
-    sprintf(namebuf, "const ");
-    index+=6;
+  if (primitive->is_structure) {
+    sprintf(namebuf, "struct ");
+    index += 7;
   }
   ulint nameindex = 0;
   while (primitive->name[nameindex] != 0 && index < ENTITIES_NAME_LENGTH) {

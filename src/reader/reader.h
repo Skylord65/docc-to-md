@@ -146,7 +146,6 @@ typedef enum {
 struct primitive_spec {
   char name[ENTITIES_NAME_LENGTH];
   PrimitiveSource source;
-  char is_constant;
   char is_structure;
 };
 struct variable {

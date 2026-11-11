@@ -65,7 +65,6 @@ static int register_primitive(source_code_t code, struct register_primitive_data
   struct primitive_spec * spec = code->primitives.array + code->primitives.count;
   code->primitives.count++;
 
-  spec->is_constant = data->is_constant;
   spec->source = data->source;
   spec->is_structure = data->is_structure;
   STRCP(data->buffer, spec->name, ENTITIES_NAME_LENGTH, 1);
@@ -205,7 +204,6 @@ static struct primitive_spec * try_parse_primitive_structure(char * input, sourc
 
     matched->is_structure = 1;
     matched->source = element->source;
-    matched->is_constant = 0;
     STRCP(element->name, matched->name, ENTITIES_NAME_LENGTH, 1);
   }
   if (changed) *end = ' ';
@@ -334,7 +332,6 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
     while (i < code->primitives.count) {
       struct primitive_spec * spec = code->primitives.array + i;
       if (
-          spec->is_constant == data.is_constant &&
           spec->source == data.source &&
           spec->is_structure == data.is_structure && // That sould be set to 0 though
           streq(data.buffer, spec->name)
