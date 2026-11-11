@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -17,6 +18,7 @@ struct register_primitive_data {
   unsigned int buffer_index;
   PrimitiveSource source;
   char is_constant;
+  char is_structure;
   unsigned int pointers_level;
   struct arrays_spec arrays;
 };
@@ -70,6 +72,7 @@ static int register_primitive(source_code_t code, struct register_primitive_data
   spec->source = data->source;
   spec->pointers_level = data->pointers_level;
   spec->arrays.count = data->arrays.count;
+  spec->is_structure = data->is_structure;
   spec->arrays.array = data->arrays.array; // This is a malloced array we pass, so we don't need to worry
   STRCP(data->buffer, spec->name, ENTITIES_NAME_LENGTH, 1);
 
@@ -120,10 +123,75 @@ static struct struct_spec * try_parse_structure(char * input, source_code_t code
 
   return NULL;
 }
+static struct primitive_spec * try_parse_primitive_structure(char * input, source_code_t code, char ** restptr) {
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
+
+  if (!starts_with(input, "struct")) return NULL;
+  GOTO_NEXTWORD(input);
+
+  char * end = input;
+  while (*end != ' ' && *end != 0) end++;
+  int changed = *end == ' ';
+  *end = 0;
+  *restptr = end;
+
+  ulint i = 0;
+  struct keyword_element predefined[] = {
+    { "random_data", Stdlib }, { "drand48_data", Stdlib },
+    { "dirent", Dirent }, { "dirent64", Dirent },
+    { "tm", Stdtime }, { "sigevent", Stdtime },
+    { "timespec", Stdtime }, { "itimerspec", Stdtime },
+    { "stat", SysStat }, { "Stringpgrep_table_element", LibStringpGrep },
+    { "Stringpgrep_table", LibStringpGrep }, { "Stringpgrep_profiles", LibStringpGrep }
+  };
+  ulint size = sizeof(predefined) / sizeof(struct keyword_element);
+
+  struct keyword_element * element = NULL;
+  while (i < size && element == NULL) {
+    if (word_eq(input, predefined[i].name)) element = predefined + i;
+    i++;
+  }
+  if (element == NULL) {
+    if (changed) *end = ' ';
+    return NULL;
+  }
+
+  // Look if the found structure exists in the registered primitives
+  ulint j = 0;
+  struct primitive_spec * matched = NULL;
+  while (j < code->primitives.count && matched == NULL) {
+    struct primitive_spec * spec = code->primitives.array + j;
+    if (spec->is_structure == 1 && streq(spec->name, element->name)) matched = code->primitives.array + j;
+    j++;
+  }
+
+  if (matched == NULL) { // This doesn't exist, thus we will create it and append it to the array
+    if ((code->primitives.array = realloc(code->primitives.array, (code->primitives.count + 1) * sizeof(struct primitive_spec))) == NULL) {
+      perror("realloc code->primitives for structure");
+      if (changed) *end = ' ';
+      return NULL;
+    }
+
+    matched = code->primitives.array + code->primitives.count;
+    code->primitives.count++;
+
+    matched->pointers_level = 0;
+    matched->is_structure = 1;
+    matched->arrays.count = 0;
+    matched->arrays.array = NULL;
+    matched->source = element->source;
+    matched->is_constant = 0;
+    STRCP(element->name, matched->name, ENTITIES_NAME_LENGTH, 1);
+  }
+  if (changed) *end = ' ';
+  return matched;
+}
 /**
  * Returns 1 if a type has been successfully registered, 0 otherwise
  *
  * It DOES NOT call register_primitive
+ * TODO change the implementation to move the pointers into the type and not the primitive
  */
 static int try_parse_primitive(char * input, struct register_primitive_data * data, int * failed) {
   *failed = 0;
@@ -244,6 +312,7 @@ static void init_primitive_data(struct register_primitive_data * p) {
   p->source = 0;
   p->pointers_level = 0;
   p->is_constant = 0;
+  p->is_structure = 0;
   p->buffer[0] = 0;
 }
 static void free_primitive_data(struct register_primitive_data * p) {
@@ -273,14 +342,25 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
   char * input_rest;
   if ((type->ptr = try_parse_structure(input, code, &input_rest)) != NULL) {
-    printf("  Parsed the structure %s\n", ((struct struct_spec *)type->ptr)->name);
+    DEBUG("  Parsed the structure %s", ((struct struct_spec *)type->ptr)->name);
     type->type = StructureType;
     if (compute_rest_of_type(input_rest, type) != 0) {
       return 1;
     }
     return 0;
-  }
-  if (try_parse_primitive(input, &data, &failed) == 0) {
+  } else if ((type->ptr = try_parse_primitive_structure(input, code, &input_rest)) != NULL) {
+    DEBUG("   Parsed the primitive structure " DBG_RED "%s", ((struct primitive_spec *)type->ptr)->name);
+    type->type = PrimitiveType;
+    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+    return 0;
+  } else if ((type->ptr = try_parse_enumerator(input, code, &input_rest)) != NULL) {
+    DEBUG("  Parsed the enumerator %s", ((struct enum_spec *)type->ptr)->name);
+    type->type = EnumeratorType;
+    if (compute_rest_of_type(input_rest, type) != 0) {
+      return 1;
+    }
+    return 0;
+  } else if (try_parse_primitive(input, &data, &failed) == 0) {
     // Find the already registered primitive if it exists
     ulint i = 0;
     while (i < code->primitives.count) {
@@ -290,6 +370,7 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
           spec->pointers_level == data.pointers_level &&
           spec->source == data.source &&
           spec->arrays.count == data.arrays.count &&
+          spec->is_structure == data.is_structure && // That sould be set to 0 though
           streq(data.buffer, spec->name) &&
           check_array_equality(data.arrays.array, spec->arrays.array, spec->arrays.count)
          ) { // Then they are the same

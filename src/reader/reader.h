@@ -32,7 +32,8 @@ typedef enum {
   FunctionType = 2,
   TypedefType = 3,
   MacroType = 4,
-  PrimitiveType = 5
+  PrimitiveType = 5,
+  EnumeratorType = 6
 } TypeTypeIndicator;
 
 struct arrays_spec {
@@ -146,6 +147,7 @@ struct primitive_spec {
   char name[ENTITIES_NAME_LENGTH];
   PrimitiveSource source;
   char is_constant;
+  char is_structure;
   unsigned int pointers_level;
   struct arrays_spec arrays;
 };
