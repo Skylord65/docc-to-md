@@ -81,7 +81,20 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           $ErrorActionPreference = "Stop"
-          $vcvars = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe introuvable" }
+
+          Write-Host "== Installations VS détectées =="
+          & $vswhere -all -products * -format text
+
+          $vsPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $vsPath) {
+            throw "Aucune installation VS avec le composant C++ (VC.Tools.x86.x64)"
+          }
+
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
           if (-not (Test-Path $vcvars)) { throw "vcvars64.bat introuvable: $vcvars" }
 
           $bat = Join-Path $env:TEMP "setup_msvc.bat"
@@ -98,6 +111,10 @@ jobs:
 
         if: matrix.os == 'windows-latest'
         run: |
+
+          where.exe cl
+          where.exe nmake
+
           $ErrorActionPreference = "Stop"
           $content = Get-Content makefile -Raw
           # Équivalent MSVC de -Werror (/WX) et suppression de -DNODEBUG
