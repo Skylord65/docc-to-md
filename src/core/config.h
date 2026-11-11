@@ -11,4 +11,12 @@ struct gen_config {
 };
 typedef struct gen_config * gen_config_t;
 
+struct result {
+  unsigned long int success;
+  unsigned long int fails;
+  unsigned long int links;
+};
+struct callback_args_s;
+typedef struct callback_args_s * callback_args;
+
 #endif

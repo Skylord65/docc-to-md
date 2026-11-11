@@ -16,18 +16,12 @@ typedef enum {
   ReadError = 2
 } recursion_return_t;
 
-struct result {
-  unsigned long int success;
-  unsigned long int fails;
-  unsigned long int links;
-};
 struct callback_args_s {
   gen_config_t config;
   source_code_t source_code;
 
   struct result results;
 };
-typedef struct callback_args_s * callback_args;
 typedef void recursion_callback_t(const char * src, callback_args params);
 
 extern recursion_return_t recursion(const char * src, callback_args params, recursion_callback_t callback);
