@@ -19,8 +19,8 @@ jobs:
 
     defaults:
       run:
-        shell: ${{ matrix.os == 'windows-latest' && 'pwsh -NoLogo -NoProfile -Command "& ''C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1'' -Arch amd64 -SkipAutomaticLocation; {0}"' || 'bash' }}
-
+        shell: ${{ matrix.os == 'windows-latest' && 'powershell -NoLogo -NoProfile -Command "& ''C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1'' -Arch amd64 -SkipAutomaticLocation; & ''{0}''; exit $LASTEXITCODE"' || 'bash' }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
