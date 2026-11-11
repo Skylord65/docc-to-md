@@ -82,13 +82,17 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $vcvars = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-          cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat introuvable: $vcvars" }
+
+          $bat = Join-Path $env:TEMP "setup_msvc.bat"
+          Set-Content -Path $bat -Value "@echo off`r`ncall `"$vcvars`" >nul`r`nset" -Encoding ASCII
+
+          & $env:ComSpec /c $bat | ForEach-Object {
             if ($_ -match '^([^=]+)=(.*)$') {
-              [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
               Add-Content -Path $env:GITHUB_ENV -Value "$($matches[1])=$($matches[2])"
             }
           }
-          where.exe cl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Modify makefile (Windows)
 
