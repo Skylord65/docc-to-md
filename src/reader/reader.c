@@ -1,4 +1,5 @@
 #include "reader.h"
+#include "../core/core.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -64,6 +65,7 @@ static void free_structures_array(struct struct_indic * structures) {
 static void free_variables(struct variables_indic * variables) {
   ulint i = 0;
   while (i < variables->count) {
+    if (variables->array[i].type != NULL) free_type(variables->array[i].type);
     free(variables->array[i].type);
     free(variables->array[i].ref);
     i++;
@@ -372,16 +374,16 @@ void summarise_parsing(source_code_t code) {
     i++;
   }
 
-  printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :\
-\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)\
-\n- %lu enumerators registered (%lu headers + %lu source)\n- %lu typedefs registered (%lu headers + %lu source)\n",
+  printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :",
     code->definitions.variables.count,
     code->definitions.functions.count + code->implementations.functions.count,
     code->definitions.functions.count,
     code->implementations.functions.count,
     code->definitions.macros.count + code->implementations.macros.count,
     code->definitions.macros.count,
-    code->implementations.macros.count,
+    code->implementations.macros.count
+  );
+  printf("\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)",
     header_fnt_macro + source_fnt_macro,
     header_fnt_macro,
     source_fnt_macro,
@@ -390,7 +392,9 @@ void summarise_parsing(source_code_t code) {
     source_var_macro,
     code->definitions.structs.count + code->implementations.structs.count,
     code->definitions.structs.count,
-    code->implementations.structs.count,
+    code->implementations.structs.count
+  );
+  printf("\n- %lu enumerators registered (%lu headers + %lu source)\n- %lu typedefs registered (%lu headers + %lu source)\n------------------------------------\n",
     code->definitions.enums.count + code->implementations.enums.count,
     code->definitions.enums.count,
     code->implementations.enums.count,
@@ -398,6 +402,11 @@ void summarise_parsing(source_code_t code) {
     code->definitions.typedefs.count,
     code->implementations.typedefs.count
   );
+}
+
+void summarise_linking(const callback_args args) {
+  if (!(args->config->verbose_registration)) return;
+  printf("------------------------------------\n%lu links made\n------------------------------------\n", args->results.links);
 }
 
 #undef ARGS_T
