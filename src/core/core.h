@@ -25,6 +25,7 @@ typedef struct gen_config * gen_config_t;
 struct result {
   unsigned long int success;
   unsigned long int fails;
+  unsigned long int links;
 };
 struct callback_args_s {
   gen_config_t config;

@@ -79,7 +79,8 @@ int main(int argc, char * argv[]) {
     .source_code = &(struct source_code){0},
     .results = (struct result){
       .success = 0,
-      .fails = 0
+      .fails = 0,
+      .links = 0
     }
   };
   init_source_code(callback_args.source_code);
