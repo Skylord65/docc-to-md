@@ -148,8 +148,6 @@ struct primitive_spec {
   PrimitiveSource source;
   char is_constant;
   char is_structure;
-  unsigned int pointers_level;
-  struct arrays_spec arrays;
 };
 struct variable {
   reference_t ref;

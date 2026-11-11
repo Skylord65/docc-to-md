@@ -19,8 +19,6 @@ struct register_primitive_data {
   PrimitiveSource source;
   char is_constant;
   char is_structure;
-  unsigned int pointers_level;
-  struct arrays_spec arrays;
 };
 /**
  * This function takes a pointer to a supposed type string where it only remains pointers and arrays to register, and modifies 'type'
@@ -62,7 +60,6 @@ static int compute_rest_of_type(char * input, entity_type_t * type) {
 static int register_primitive(source_code_t code, struct register_primitive_data * data) {
   if ((code->primitives.array = realloc(code->primitives.array, sizeof(struct primitive_spec) * (code->primitives.count + 1))) == NULL) {
     perror("realloc primitive array");
-    if (data->arrays.array != NULL) free(data->arrays.array);
     return 1;
   }
   struct primitive_spec * spec = code->primitives.array + code->primitives.count;
@@ -70,10 +67,7 @@ static int register_primitive(source_code_t code, struct register_primitive_data
 
   spec->is_constant = data->is_constant;
   spec->source = data->source;
-  spec->pointers_level = data->pointers_level;
-  spec->arrays.count = data->arrays.count;
   spec->is_structure = data->is_structure;
-  spec->arrays.array = data->arrays.array; // This is a malloced array we pass, so we don't need to worry
   STRCP(data->buffer, spec->name, ENTITIES_NAME_LENGTH, 1);
 
   return 0;
@@ -209,10 +203,7 @@ static struct primitive_spec * try_parse_primitive_structure(char * input, sourc
     matched = code->primitives.array + code->primitives.count;
     code->primitives.count++;
 
-    matched->pointers_level = 0;
     matched->is_structure = 1;
-    matched->arrays.count = 0;
-    matched->arrays.array = NULL;
     matched->source = element->source;
     matched->is_constant = 0;
     STRCP(element->name, matched->name, ENTITIES_NAME_LENGTH, 1);
@@ -224,9 +215,8 @@ static struct primitive_spec * try_parse_primitive_structure(char * input, sourc
  * Returns 1 if a type has been successfully registered, 0 otherwise
  *
  * It DOES NOT call register_primitive
- * TODO change the implementation to move the pointers into the type and not the primitive
  */
-static int try_parse_primitive(char * input, struct register_primitive_data * data, int * failed) {
+static int try_parse_primitive(char * input, struct register_primitive_data * data, char ** restptr, int * failed) {
   *failed = 0;
   if (starts_with(input, "const")) {
     data->is_constant = 1;
@@ -234,7 +224,6 @@ static int try_parse_primitive(char * input, struct register_primitive_data * da
   } else data->is_constant = 0;
 
   if (starts_with(input, "struct") || starts_with(input, "enum")) return 0;
-  int needs_operation = 0;
   // This for long ass list of words
   struct keyword_element fatass_list[] = {
     { "signed", GlibC }, { "unsigned", GlibC },
@@ -295,42 +284,8 @@ static int try_parse_primitive(char * input, struct register_primitive_data * da
     }
 
     if (*input == '*' || *input == '[') {
-      needs_operation = 1;
+      *restptr = input - 1;
       break;
-    }
-  }
-
-  if (needs_operation) {
-    while (*input != 0) {
-      if (*input == '*') data->pointers_level++;
-      else if (*input == '[') {
-        char temp[ENTITIES_NAME_LENGTH];
-        int i = 0;
-        input++;
-        while (*input != ']') {
-          temp[i] = *input;
-          i++;
-          input++;
-        }
-
-        if ((data->arrays.array = realloc(data->arrays.array, sizeof(char *) * (data->arrays.count + 1))) == NULL) {
-          perror("realloc data->arrays.array");
-          *failed = 1;
-          return 1;
-        }
-        temp[i] = 0;
-        if (i == 0) data->arrays.array[data->arrays.count] = NULL;
-        else {
-          if ((data->arrays.array[data->arrays.count] = strdup(temp)) == NULL) {
-            perror("strdup data arrays");
-            free(data->arrays.array);
-            *failed = 1;
-            return 1;
-          }
-        }
-        data->arrays.count++;
-      }
-        input++;
     }
   }
 
@@ -339,33 +294,11 @@ static int try_parse_primitive(char * input, struct register_primitive_data * da
 }
 
 static void init_primitive_data(struct register_primitive_data * p) {
-  p->arrays.count = 0;
-  p->arrays.array = NULL;
   p->buffer_index = 0;
   p->source = 0;
-  p->pointers_level = 0;
   p->is_constant = 0;
   p->is_structure = 0;
   p->buffer[0] = 0;
-}
-static void free_primitive_data(struct register_primitive_data * p) {
-  if (p->arrays.count > 0) {
-    ulint i = 0;
-    while (i < p->arrays.count) {
-      if (p->arrays.array[i] != NULL) free(p->arrays.array[i]);
-      i++;
-    }
-    free(p->arrays.array);
-  }
-}
-static int check_array_equality(char ** a, char ** b, ulint size) {
-  ulint i = 0;
-  while (i < size) {
-    if ((a[i] != NULL && b[i] == NULL) || (b[i] != NULL && a[i] == NULL)) return 0;
-    if (a[i] != NULL && !streq(a[i], b[i])) return 0;
-    i++;
-  }
-  return 1;
 }
 static int assign_type(source_code_t code, char * input, entity_type_t * type) {
   int failed;
@@ -393,23 +326,21 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
       return 1;
     }
     return 0;
-  } else if (try_parse_primitive(input, &data, &failed) == 0) {
+  } else if (try_parse_primitive(input, &data, &input_rest, &failed) == 0) {
+    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+
     // Find the already registered primitive if it exists
     ulint i = 0;
     while (i < code->primitives.count) {
       struct primitive_spec * spec = code->primitives.array + i;
       if (
           spec->is_constant == data.is_constant &&
-          spec->pointers_level == data.pointers_level &&
           spec->source == data.source &&
-          spec->arrays.count == data.arrays.count &&
           spec->is_structure == data.is_structure && // That sould be set to 0 though
-          streq(data.buffer, spec->name) &&
-          check_array_equality(data.arrays.array, spec->arrays.array, spec->arrays.count)
+          streq(data.buffer, spec->name)
          ) { // Then they are the same
         type->ptr = spec;
         type->type = PrimitiveType;
-        free_primitive_data(&data);
         return 1;
       }
     }

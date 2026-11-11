@@ -124,19 +124,6 @@ static void free_typedefs(struct typedef_indic * tds) {
   free(tds->array);
 }
 static void free_primitives(struct primitives_indic * primitives) {
-  ulint i = 0;
-  while (i < primitives->count) {
-    if (primitives->array[i].arrays.count > 0) {
-      ulint j = 0;
-      while (j < primitives->array[i].arrays.count) {
-        if (primitives->array[i].arrays.array[j] != NULL) free(primitives->array[i].arrays.array[j]);
-        j++;
-      }
-
-      free(primitives->array[i].arrays.array);
-    }
-    i++;
-  }
   if (primitives->count > 0) free(primitives->array);
 }
 void free_source_code(source_code_t code) {
@@ -315,26 +302,6 @@ static void dump_primitive(ARGS_T, struct primitive_spec * primitive) {
     namebuf[index] = primitive->name[nameindex];
     index++;
     nameindex++;
-  }
-  if (primitive->pointers_level > 0) {
-    namebuf[index++] = ' ';
-    ulint count = 0;
-    while (count < primitive->pointers_level) {
-      namebuf[index++] = '*';
-      count++;
-    }
-  }
-  if (primitive->arrays.count > 0) {
-    namebuf[index++] = ' ';
-    ulint i = 0;
-    while (i < primitive->arrays.count) {
-      namebuf[index++] = '[';
-      if (primitive->arrays.array[i] != NULL) {
-        ulint j = 0;
-        while (j < primitive->arrays.count && primitive->arrays.array[i][j] != 0) namebuf[index++] = primitive->arrays.array[i][j++];
-      }
-      namebuf[index++] = ']';
-    }
   }
   namebuf[index++] = 0;
   DUMP("/Primitive %s\nContains elements of :", namebuf);
