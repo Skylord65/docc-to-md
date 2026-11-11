@@ -90,6 +90,39 @@ static int word_eq(const char * sentence, const char * word) {
   }
   return *word == 0 && (*sentence == ' ' || *sentence == 0);
 }
+static struct enum_spec * try_parse_enumerator(char * input, source_code_t code, char ** restptr) {
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
+
+  if (!starts_with(input, "enum")) return NULL;
+  GOTO_NEXTWORD(input);
+
+  char * end = input;
+  while (*end != ' ' && *end != 0) end++;
+  int changed = *end == ' ';
+  *end = 0;
+  *restptr = end;
+
+  ulint i = 0;
+  while (i < code->definitions.enums.count) {
+    if (streq(code->definitions.enums.array[i].name, input)) {
+      if (changed) *end = ' ';
+      return code->definitions.enums.array + i;
+    }
+    i++;
+  }
+  i = 0;
+  while (i < code->implementations.structs.count) {
+    if (streq(code->implementations.structs.array[i].name, input)) {
+      if (changed) *end = ' ';
+      return code->implementations.enums.array + i;
+    }
+    i++;
+  }
+  if (changed) *end = ' ';
+
+  return NULL;
+}
 static struct struct_spec * try_parse_structure(char * input, source_code_t code, char ** restptr) {
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
