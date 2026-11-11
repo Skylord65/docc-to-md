@@ -11,10 +11,10 @@ on:
 jobs:
   syntax:
     strategy:
-    matrix:
-      include:
-        - os: windows-latest
-        - os: arch
+      matrix:
+        include:
+          - os: windows-latest
+          - os: arch
     runs-on: arch
     steps:
       - name: Checkout repository
