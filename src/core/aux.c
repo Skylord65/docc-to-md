@@ -1046,6 +1046,7 @@ int try_extract_function(char *buffer, const char *path, callback_args args, str
   // For now we will focus only on oneline functions declarations/implementations
   // Also, we will ignore functions DECLARATIONS in source files
   while (*buffer == ' ') buffer++;
+  if (*buffer == '#') return 0;
 
   struct function_multiline_status_s * data;
   if ((data = malloc(sizeof(struct function_multiline_status_s))) == NULL) {
