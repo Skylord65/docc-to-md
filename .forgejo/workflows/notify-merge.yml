@@ -33,6 +33,8 @@ jobs:
             echo "Merged in [commit `${COMMIT}`](${URL}/commit/${COMMIT})"
           } >> "$MD_FILE"
 
+          cat "$MD_FILE"
+
       - name: send-data
         uses: ./.forgejo/actions/discord-notify
         with:
