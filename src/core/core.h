@@ -2,6 +2,7 @@
 #define __CORE_H__
 
 #include "../reader/reader.h"
+#include "config.h"
 
 #include <linux/limits.h>
 #include <unistd.h>
@@ -15,13 +16,6 @@ typedef enum {
   ReadError = 2
 } recursion_return_t;
 
-struct gen_config {
-  char src[PATH_MAX];
-  char dest[PATH_MAX];
-  char work[PATH_MAX];
-  int verbose_registration;
-};
-typedef struct gen_config * gen_config_t;
 struct result {
   unsigned long int success;
   unsigned long int fails;
