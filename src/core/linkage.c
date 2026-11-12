@@ -379,28 +379,44 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
   init_primitive_data(&data);
 
   char * input_rest = NULL;
-  if ((type->ptr = identify_macro(input, code)) != NULL) {
-    type->type = MacroType;
-  } else if ((type->ptr = try_parse_structure(input, code, &input_rest)) != NULL) {
-    type->type = StructureType;
-    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+  void * res;
+  if ((res = identify_macro(input, code)) != NULL) {
+    if (type != NULL) {
+      type->ptr = res;
+      type->type = MacroType;
+    }
+  } else if ((res = try_parse_structure(input, code, &input_rest)) != NULL) {
+    if (type != NULL) {
+      type->ptr = res;
+      type->type = StructureType;
+      if (compute_rest_of_type(input_rest, type) != 0) return 1;
+    }
     return 0;
-  } else if ((type->ptr = identify_typedef(input, code, &input_rest)) != NULL) {
-    type->type = TypedefType;
-    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+  } else if ((res = identify_typedef(input, code, &input_rest)) != NULL) {
+    if (type != NULL) {
+      type->ptr = res;
+      type->type = TypedefType;
+      if (compute_rest_of_type(input_rest, type) != 0) return 1;
+    }
     return 0;
-  } else if ((type->ptr = try_parse_primitive_structure(input, code, &input_rest)) != NULL) {
-    type->type = PrimitiveType;
-    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+  } else if ((res = try_parse_primitive_structure(input, code, &input_rest)) != NULL) {
+    if (type != NULL) {
+      type->ptr = res;
+      type->type = PrimitiveType;
+      if (compute_rest_of_type(input_rest, type) != 0) return 1;
+    }
     return 0;
-  } else if ((type->ptr = try_parse_enumerator(input, code, &input_rest)) != NULL) {
-    type->type = EnumeratorType;
-    if (compute_rest_of_type(input_rest, type) != 0) {
-      return 1;
+  } else if ((res = try_parse_enumerator(input, code, &input_rest)) != NULL) {
+    if (type != NULL) {
+      type->ptr = res;
+      type->type = EnumeratorType;
+      if (compute_rest_of_type(input_rest, type) != 0) {
+        return 1;
+      }
     }
     return 0;
   } else if (try_parse_primitive(input, &data, &input_rest) == 0) {
-    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+    if (type != NULL && compute_rest_of_type(input_rest, type) != 0) return 1;
 
     // Find the already registered primitive if it exists
     ulint i = 0;
@@ -411,8 +427,10 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
           spec->is_structure == data.is_structure && // That sould be set to 0 though
           streq(data.buffer, spec->name)
          ) { // Then they are the same
-        type->ptr = spec;
-        type->type = PrimitiveType;
+        if (type != NULL) {
+          type->ptr = spec;
+          type->type = PrimitiveType;
+        }
         return 0;
       }
       i++;
@@ -420,8 +438,10 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
     if (register_primitive(code, &data) != 0) return 1;
     // The added primitive is automatically the last
-    type->ptr = code->primitives.array + (code->primitives.count - 1);
-    type->type = PrimitiveType;
+    if (type != NULL) {
+      type->ptr = code->primitives.array + (code->primitives.count - 1);
+      type->type = PrimitiveType;
+    }
   } else {
     return 1;
   }
@@ -650,7 +670,7 @@ static int link_typedefs_result(struct typedef_indic * typedefs, source_code_t c
 #undef CHECK
 
 static int prepare_function(struct function_spec * function, source_code_t code, callback_args args) {
-  if (assign_type(code, function->returntype.string, &(function->returntype)) != 0) {
+  if (assign_type(code, function->returntype.string, NULL) != 0) {
     fprintf(stderr, "Cannot assign return type of function %s (return type string is %s)\n", function->name, function->returntype.string);
     args->results.fails++;
     return 1;
@@ -674,7 +694,7 @@ static int prepare_function(struct function_spec * function, source_code_t code,
       STRCP(typebuf, arg->type.string, ENTITIES_NAME_LENGTH, 1);
       snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%zu", j + 1);
     }
-    if (assign_type(code, input, &(arg->type)) != 0) {
+    if (assign_type(code, input, NULL) != 0) {
       fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
       args->results.fails++;
       return 1;
@@ -687,7 +707,7 @@ static int prepare_function(struct function_spec * function, source_code_t code,
 static int prepare_functions(struct function_indic * functions, source_code_t code, callback_args args) {
   ulint i = 0;
   while (i < functions->count) {
-    link_function(functions->array + i, code, args);
+    prepare_function(functions->array + i, code, args);
     i++;
   }
 
@@ -696,7 +716,7 @@ static int prepare_functions(struct function_indic * functions, source_code_t co
 static int prepare_struct(struct struct_spec * strc, source_code_t code, callback_args args) {
   ulint j = 0;
   while (j < strc->members->count) {
-    if (assign_type(code, strc->members->array[j].type.string, &(strc->members->array[j].type)) != 0) {
+    if (assign_type(code, strc->members->array[j].type.string, NULL) != 0) {
       fprintf(stderr, "Cannot assign type to member number %zu (%s) of structure %s\n", j + 1, strc->members->array[j].name, strc->name);
       args->results.fails++;
       return 1;
@@ -709,7 +729,7 @@ static int prepare_struct(struct struct_spec * strc, source_code_t code, callbac
 static int prepare_structs(struct struct_indic * structs, source_code_t code, callback_args args) {
   ulint i = 0;
   while (i < structs->count) {
-    link_struct(structs->array + i, code, args);
+    prepare_struct(structs->array + i, code, args);
     i++;
   }
   return 0;
@@ -718,7 +738,7 @@ static int prepare_variables(struct variables_indic * variables, source_code_t c
   ulint i = 0;
   while (i < variables->count) {
     struct variable * var = variables->array + i;
-    if (assign_type(code, var->type->string, var->type) != 0) {
+    if (assign_type(code, var->type->string, NULL) != 0) {
       fprintf(stderr, "Cannot assign type to variable %s (type : %s)\n", var->name, var->type->string);
       args->results.fails++;
       return 1;
