@@ -98,7 +98,7 @@ static void get_type_location(entity_type_t type, source_code_t code, char * wri
         designation = "na";
         break;
     }
-    index = sprintf(writebuffer, "%ss-%s.md#%s-", designation, locationstr, designation);
+    index = sprintf(writebuffer, "%s-%ss.md#%s-", locationstr, designation, designation);
   }
   size_t i = 0;
   while (name[i] != 0 && i < ENTITIES_NAME_LENGTH) {
@@ -207,7 +207,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
     while (x < fnt->args->count) {
       MDDUMP("%zu. **%s** : [`", x + 1, fnt->args->array[x].name);
       dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
-      get_type_location(fnt->returntype, code, displaypath);
+      get_type_location(fnt->args->array[x].type, code, displaypath);
       MDDUMP("`](%s)\n", displaypath);
       x++;
     }
