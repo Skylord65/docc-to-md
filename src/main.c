@@ -108,8 +108,14 @@ int main(int argc, char * argv[]) {
 
   dump(callback_args.source_code, args[5], args[6]);
 
-  render(callback_args.source_code, &config, &(callback_args.results));
+  if (render(callback_args.source_code, &config, &(callback_args.results)) != 0) {
+    fprintf(stderr, "Failed to generate documentation\n");
+    cleanup(&config);
+    free_source_code(callback_args.source_code);
+    return 1;
+  }
 
   cleanup(&config);
   free_source_code(callback_args.source_code);
+  return 0;
 }
