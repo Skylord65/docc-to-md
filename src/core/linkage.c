@@ -338,41 +338,6 @@ static void init_primitive_data(struct register_primitive_data * p) {
   p->is_structure = 0;
   p->buffer[0] = 0;
 }
-static int preparing(source_code_t code, char * input, entity_type_t * type) {
-  struct register_primitive_data data;
-
-  init_primitive_data(&data);
-
-  char * input_rest = NULL;
-  if (try_parse_primitive_structure(input, code, &input_rest) != NULL) {
-    return 0;
-  } else if (try_parse_primitive(input, &data, &input_rest) == 0) {
-    if (compute_rest_of_type(input_rest, type) != 0) return 1;
-
-    // Find the already registered primitive if it exists
-    ulint i = 0;
-    while (i < code->primitives.count) {
-      struct primitive_spec * spec = code->primitives.array + i;
-      if (
-          spec->source == data.source &&
-          spec->is_structure == data.is_structure && // That sould be set to 0 though
-          streq(data.buffer, spec->name)
-         ) { // Then they are the same
-        type->ptr = spec;
-        type->type = PrimitiveType;
-        return 0;
-      }
-      i++;
-    }
-
-    if (register_primitive(code, &data) != 0) return 1;
-    // The added primitive is automatically the last
-    type->ptr = code->primitives.array + (code->primitives.count - 1);
-    type->type = PrimitiveType;
-  }
-
-  return 0; // Everything went fine
-}
 static int assign_type(source_code_t code, char * input, entity_type_t * type) {
   struct register_primitive_data data;
 

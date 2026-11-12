@@ -227,7 +227,7 @@ static void write_primitive_ref(struct primitive_spec * primitive, char * output
   output[i] = 0;
 }
 #define PRIMITIVE_DUMP(p, TEST_MACRO, text) if (TEST_MACRO(p->source)) MDDUMP("- " text "");
-static void generate_primitives(MDARGS_T, struct primitives_indic * primitives) {
+static void generate_primitives(gen_config_t config, struct result *result, char *buffer, struct primitives_indic *primitives) {
   PREPARE;
   PATHNAME(pathbuf, config, "primitives.md");
   OPEN(fd, pathbuf, result);
@@ -352,7 +352,7 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
   generate_structures_page(MDARGS_V, &(code->definitions.structs), 1);
   generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
-  generate_primitives(MDARGS_V, &(code->primitives));
+  generate_primitives(config, result, buffer, &(code->primitives));
   return result->fails > before;
 }
 
