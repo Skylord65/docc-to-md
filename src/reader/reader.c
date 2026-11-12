@@ -413,7 +413,7 @@ void summarise_parsing(source_code_t code) {
 
 void summarise_linking(const callback_args args) {
   if (!(args->config->verbose_registration)) return;
-  printf("------------------------------------\n%lu links made\n------------------------------------\n", args->results.links);
+  printf("------------------------------------\n%zu links made\n------------------------------------\n", args->results.links);
 }
 
 #undef ARGS_T
