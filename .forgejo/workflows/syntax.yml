@@ -30,6 +30,14 @@ jobs:
         run: |
           sudo pacman -Sy --noconfirm time
 
+      - name: Force LF line endings (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          git config core.autocrlf false
+          git rm --cached -r -q .
+          git reset --hard -q
+          Remove-Item -Recurse -Force test/out, test/dump, test/work -ErrorAction SilentlyContinue
+
       - name: Modify makefile
         if: matrix.os != 'windows-latest'
         run: |
