@@ -384,7 +384,7 @@ static int link_function(struct function_spec * function, source_code_t code, ca
     }
     if (input != arg->type.string) { // Also replace name of argument and type
       STRCP(typebuf, arg->type.string, ENTITIES_NAME_LENGTH, 1);
-      snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%lu", j + 1);
+      snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%zu", j + 1);
     }
     if (assign_type(code, input, &(arg->type)) != 0) {
       fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
@@ -543,7 +543,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       STRCP(td->name, ((struct struct_spec *)status.data)->name, ENTITIES_NAME_LENGTH, 1);
 
       ((struct struct_multiline_status_s *)(status.data))->doubleptr = (struct struct_spec **)(&td->definition.ptr);
-      unsigned long int before = args->results.fails;
+      size_t before = args->results.fails;
       register_structure("", args, &status);
       if (args->results.fails > before) {
         fprintf(stderr, "Failed to register structure type %s for typedef %s\n", td->buffer, td->name);
