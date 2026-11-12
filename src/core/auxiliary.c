@@ -1603,15 +1603,17 @@ int try_extract_enum(char * buffer, const char * path, callback_args args, struc
   SKIP_BOTH(buffer);
 did_checks: // From there, buffer is expected to be positionned at the beginning of the said name (it might not be the name, but that's where it is supposed to be)
   turtle = buffer;
-  while (*turtle != ' ') turtle++;
-  if (turtle == buffer) {
-    fprintf(stderr, "    /!\\ Invalid enum construction at %s:%lld\n", path, status->line_count);
-    free(data);
-    return 1;
+  if (status->automatic) {
+    while (*turtle != ' ') turtle++;
+    if (turtle == buffer) {
+      fprintf(stderr, "    /!\\ Invalid enum construction at %s:%lld\n", path, status->line_count);
+      free(data);
+      return 1;
+    }
+    *turtle = 0;
+    STRCP(buffer, data->name, ENTITIES_NAME_LENGTH, 1);
+    *turtle = ' ';
   }
-  *turtle = 0;
-  STRCP(buffer, data->name, ENTITIES_NAME_LENGTH, 1);
-  *turtle = ' ';
 
   // Now go through, we expect either '{' or ';'
   SKIP_VOID(turtle);
@@ -1744,11 +1746,15 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
   if (GET_TCOUNT(status->is_header, args->source_code) == 1) free(td);\
 }
 
-static char * obtain_last_word_from_end(char * end) {
+static char * obtain_last_word_from_end(char * end, char * end_char, char ** endpos, char * word_char, char ** wordpos) {
   while (*end != ' ') end--;
   char * word = end + 1;
 
   while (*end == ' ') end--;
+  *end_char = *(end + 1);
+  *endpos = end + 1;
+  *word_char = *(word - 1);
+  *wordpos = word - 1;
   *(end + 1) = 0;
   *(word - 1) = 0;
 
@@ -1851,7 +1857,6 @@ static int register_typedef(const char * path, callback_args args, struct status
       }
       cp--;
     }
-    printf("\n");
     if (start_of_name == NULL) {
       fprintf(stderr, "Failed to parse function name for typedef.\n");
       args->results.fails++;
@@ -1875,8 +1880,15 @@ static int register_typedef(const char * path, callback_args args, struct status
     td->is_function = 1;
   } else {
     td->is_function = 0;
-    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index); // In that case this is fine
+    char end_char;
+    char word_char;
+    char * word_pos;
+    char * end_pos;
+    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index, &end_char, &end_pos, &word_char, &word_pos); // In that case this is fine
     STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
+
+    *word_pos = word_char;
+    *end_pos = end_char;
   }
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
   td->ref->line = data->starts_on_line;

@@ -1,5 +1,4 @@
 #include "core.h"
-#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -464,10 +463,8 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
   // First check if it could be defined here : a keyword followed by something else than {
   char * ptr = td->buffer;
   if (word_eq(ptr, "typedef")) GOTO_NEXTWORD(ptr);
-  DEBUG("Working on " DBG_RED "%s", td->buffer);
   if (word_eq(ptr, "enum")) {
-    DEBUG("Starting enum");
-    GOTO_NEXTWORD(td->buffer);
+    GOTO_NEXTWORD(ptr);
     if (*ptr != '{') { // Here we go and try
       struct status_s status = {
         .reading_multiline_enum = 0,
