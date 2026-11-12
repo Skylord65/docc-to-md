@@ -15,7 +15,10 @@ struct gen_config {
   char src[PATH_MAX];
   char dest[PATH_MAX];
   char work[PATH_MAX];
+  char * srccp;
+  char * srcdirname;
   int verbose_registration;
+  char * rebase_prefix;
 };
 typedef struct gen_config * gen_config_t;
 

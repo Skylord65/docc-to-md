@@ -35,8 +35,12 @@ extern recursion_return_t recursion(const char * src, callback_args params, recu
 extern void recursion_callback(const char * src, callback_args params);
 extern void remove_comments_callback(const char * src, callback_args params);
 extern void register_doccumments_callback(const char * src, callback_args params);
-
-extern int create_config(const char * src, const char * dst, const char * work, gen_config_t);
+/*
+ * This function replaces in `path` the source `replace` by the new path `by`.
+ * It writes in buffer as the function goes by
+ */
+extern void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max);
+extern int create_config(const char * src, const char * dst, const char * work, const char * rebase_prefix, gen_config_t);
 extern int mkdirp(const char * path);
 extern int rmdirrf(const char * path);
 extern void cleanup(gen_config_t);

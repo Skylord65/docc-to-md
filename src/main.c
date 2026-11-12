@@ -50,7 +50,8 @@ int main(int argc, char * argv[]) {
     { "-d", "Dump parsed source code to a file. Needs --dump to specify file name", Presence, 0, 0, NULL },
     { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL },
     { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL },
-    { "--enable-commentdoc", "Enable the registration of doc comments for functions", Presence, 0, 0, NULL }
+    { "--enable-commentdoc", "Enable the registration of doc comments for functions", Presence, 0, 0, NULL },
+    { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -69,7 +70,7 @@ int main(int argc, char * argv[]) {
   if (!args[1].found) ARG_MISSING(args[1]);
 
   struct gen_config config;
-  if (create_config(args[0].str_result, args[1].str_result, args[2].str_result, &config) != 0) {
+  if (create_config(args[0].str_result, args[1].str_result, args[2].str_result, args[9].str_result, &config) != 0) {
     fprintf(stderr, "Failed to parse config\n");
     return 1;
   }

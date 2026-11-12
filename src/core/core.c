@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -324,7 +325,7 @@ fail:
 int rmdirrf(const char * path) {
   return rmdirrec(path);
 }
-int create_config(const char * src, const char * dst, const char * work, gen_config_t configp) {
+int create_config(const char * src, const char * dst, const char * work, const char * rebase_prefix, gen_config_t configp) {
   if (realpath(src, configp->src) == NULL) {
     perror("realpath");
     return 1;
@@ -362,7 +363,20 @@ int create_config(const char * src, const char * dst, const char * work, gen_con
     perror("mkdirp work back");
     return 1;
   }
+  if ((configp->srccp = strdup(configp->src)) == NULL) {
+    perror("strdup src copy");
+    return 1;
+  }
+  if ((configp->srcdirname = dirname(configp->srccp)) == NULL) {
+    perror("dirname");
+    free(configp->srccp);
+  }
+  ulint i = 0;
+  while (configp->srcdirname[i] != 0 && i < PATH_MAX - 1) i++;
+  configp->srcdirname[i++] = '/';
+  configp->srcdirname[i++] = 0;
 
+  configp->rebase_prefix = (char *)rebase_prefix;
   return 0;
 }
 int mkdirp(const char * path) {
@@ -532,5 +546,6 @@ void register_doccumments_callback(const char * src, callback_args params) {
 }
 
 void cleanup(gen_config_t config) {
+  free(config->srccp);
   rmdirrf(config->work);
 }
