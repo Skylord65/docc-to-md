@@ -1,6 +1,3 @@
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
-
 #if defined(_WIN32)
   #include <stdlib.h>
   #ifndef PATH_MAX
@@ -9,6 +6,10 @@
 #else
   #include <limits.h>
 #endif
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
+
+#include <stddef.h>
 
 struct gen_config {
   char src[PATH_MAX];
