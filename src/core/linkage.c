@@ -310,6 +310,41 @@ static void init_primitive_data(struct register_primitive_data * p) {
   p->is_structure = 0;
   p->buffer[0] = 0;
 }
+static int preparing(source_code_t code, char * input, entity_type_t * type) {
+struct register_primitive_data data;
+
+  init_primitive_data(&data);
+
+  char * input_rest = NULL;
+  if (try_parse_primitive_structure(input, code, &input_rest) != NULL) {
+    return 0;
+  } else if (try_parse_primitive(input, &data, &input_rest) == 0) {
+    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+
+    // Find the already registered primitive if it exists
+    ulint i = 0;
+    while (i < code->primitives.count) {
+      struct primitive_spec * spec = code->primitives.array + i;
+      if (
+          spec->source == data.source &&
+          spec->is_structure == data.is_structure && // That sould be set to 0 though
+          streq(data.buffer, spec->name)
+         ) { // Then they are the same
+        type->ptr = spec;
+        type->type = PrimitiveType;
+        return 0;
+      }
+      i++;
+    }
+
+    if (register_primitive(code, &data) != 0) return 1;
+    // The added primitive is automatically the last
+    type->ptr = code->primitives.array + (code->primitives.count - 1);
+    type->type = PrimitiveType;
+  }
+
+  return 0; // Everything went fine
+}
 static int assign_type(source_code_t code, char * input, entity_type_t * type) {
   struct register_primitive_data data;
 
@@ -450,8 +485,6 @@ static int link_variables(struct variables_indic * variables, source_code_t code
  * We want to assign them if the types exists and are like pointers, like :
  * struct filestream;
  * typedef struct filestream * stream_p;
- *
- * TODO : also link the resulting types
  */
 static int link_typedef(struct typedef_spec * td, source_code_t code, callback_args args) {
   (void)code;
@@ -583,8 +616,98 @@ static int link_typedefs_result(struct typedef_indic * typedefs, source_code_t c
   return 0;
 }
 #undef CHECK
+
+static int prepare_function(struct function_spec * function, source_code_t code, callback_args args) {
+  if (assign_type(code, function->returntype.string, &(function->returntype)) != 0) {
+    fprintf(stderr, "Cannot assign return type of function %s (return type string is %s)\n", function->name, function->returntype.string);
+    args->results.fails++;
+    return 1;
+  }
+
+  ulint j = 0;
+  while (j < function->args->count) {
+    struct function_arg * arg = function->args->array + j;
+    // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the type of the argument is struct or enum.
+    // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
+    char typebuf[ENTITIES_NAME_LENGTH + 8] = {0};
+    char * input = arg->type.string;
+    if (streq("struct", arg->type.string)) {
+      snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "struct %s", arg->name); // We get struct nameOfStruct
+      input = typebuf;
+    } else if (streq("enum", arg->type.string)) {
+      snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "enum %s", arg->name); // We get eunm NameOfEnum
+      input = typebuf;
+    }
+    if (input != arg->type.string) { // Also replace name of argument and type
+      STRCP(typebuf, arg->type.string, ENTITIES_NAME_LENGTH, 1);
+      snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%zu", j + 1);
+    }
+    if (assign_type(code, input, &(arg->type)) != 0) {
+      fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
+      args->results.fails++;
+      return 1;
+    }
+    j++;
+  }
+  args->results.links += 1 + function->args->count;
+  return 0;
+}
+static int prepare_functions(struct function_indic * functions, source_code_t code, callback_args args) {
+  ulint i = 0;
+  while (i < functions->count) {
+    link_function(functions->array + i, code, args);
+    i++;
+  }
+
+  return 0;
+}
+static int prepare_struct(struct struct_spec * strc, source_code_t code, callback_args args) {
+  ulint j = 0;
+  while (j < strc->members->count) {
+    if (assign_type(code, strc->members->array[j].type.string, &(strc->members->array[j].type)) != 0) {
+      fprintf(stderr, "Cannot assign type to member number %zu (%s) of structure %s\n", j + 1, strc->members->array[j].name, strc->name);
+      args->results.fails++;
+      return 1;
+    }
+    j++;
+  }
+  args->results.links += strc->members->count;
+  return 0;
+}
+static int prepare_structs(struct struct_indic * structs, source_code_t code, callback_args args) {
+  ulint i = 0;
+  while (i < structs->count) {
+    link_struct(structs->array + i, code, args);
+    i++;
+  }
+  return 0;
+}
+static int prepare_variables(struct variables_indic * variables, source_code_t code, callback_args args) {
+  ulint i = 0;
+  while (i < variables->count) {
+    struct variable * var = variables->array + i;
+    if (assign_type(code, var->type->string, var->type) != 0) {
+      fprintf(stderr, "Cannot assign type to variable %s (type : %s)\n", var->name, var->type->string);
+      args->results.fails++;
+      return 1;
+    }
+    i++;
+  }
+  args->results.links += variables->count;
+  return 0;
+}
+
+static int prepare_linkage(source_code_t code, callback_args args) {
+  prepare_functions(&(code->definitions.functions), code, args);
+  prepare_functions(&(code->implementations.functions), code, args);
+  prepare_structs(&(code->definitions.structs), code, args);
+  prepare_structs(&(code->implementations.structs), code, args);
+  prepare_variables(&(code->definitions.variables), code, args);
+  return 0;
+}
 int linkage(source_code_t code, callback_args args) {
   size_t before = args->results.fails;
+  prepare_linkage(code, args);
   link_functions(&(code->definitions.functions), code, args);
   link_functions(&(code->implementations.functions), code, args);
   link_structs(&(code->definitions.structs), code, args);
