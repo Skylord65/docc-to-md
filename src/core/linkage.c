@@ -391,7 +391,7 @@ static int link_functions(struct function_indic * functions, source_code_t code,
         snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%lu", j + 1);
       }
       if (assign_type(code, input, &(arg->type)) != 0) {
-        fprintf(stderr, "Cannot assign type of argument number %lu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
+        fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
         args->results.fails++;
         return 1;
       }
