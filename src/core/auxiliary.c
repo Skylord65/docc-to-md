@@ -575,11 +575,18 @@ static void compute_struct_member(char * value, char ** type, char ** name, int 
   *type = input;
 }
 #define GET_COUNT(is_header, source_code) ((is_header) ? (source_code->definitions.structs.count) : (source_code->implementations.structs.count))
-static int register_structure(const char * filename, callback_args params, struct status_s * status) {
+int register_structure(const char * filename, callback_args params, struct status_s * status) {
   struct struct_multiline_status_s * data = status->data;
 
   struct struct_spec * structure;
-  if (status->is_header) {
+  if (data->doubleptr != NULL) {
+    if ((*(data->doubleptr) = malloc(sizeof(struct struct_spec))) == NULL) {
+      perror("malloc struct_spec");
+      params->results.fails++;
+      return 0;
+    }
+    structure = *(data->doubleptr);
+  } else if (status->is_header) {
     if (params->source_code->definitions.structs.count == 0) {
       if ((params->source_code->definitions.structs.array = malloc(sizeof(struct struct_spec))) == NULL) {
         perror("malloc struct_spec");
@@ -614,14 +621,14 @@ static int register_structure(const char * filename, callback_args params, struc
   }
   if ((structure->ref = malloc(sizeof(struct reference))) == NULL) {
     perror("malloc struct_spec->ref");
-    if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
+    if (data->doubleptr != NULL || GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
     params->results.fails++;
     return 0;
   }
   if ((structure->members = malloc(sizeof(struct struct_members))) == NULL) {
     perror("malloc struct_spec->members");
     free(structure->ref);
-    if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
+    if (data->doubleptr != NULL || GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
     params->results.fails++;
     return 0;
   }
@@ -631,7 +638,7 @@ static int register_structure(const char * filename, callback_args params, struc
       perror("malloc struct_spec->members->array");
       free(structure->members);
       free(structure->ref);
-      if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
+      if (data->doubleptr != NULL || GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
       params->results.fails++;
       return 0;
     }
@@ -652,7 +659,7 @@ static int register_structure(const char * filename, callback_args params, struc
         free(structure->members->array);
         free(structure->members);
         free(structure->ref);
-        if (GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
+        if (data->doubleptr != NULL || GET_COUNT(status->is_header, params->source_code) == 1) free(structure);
         if (free_type && typebuf != NULL) free(typebuf);
         return 0;
       }
@@ -675,8 +682,10 @@ static int register_structure(const char * filename, callback_args params, struc
   structure->members->count = data->members_count;
   structure->ref->line = data->starts_on_line;
 
-  if (status->is_header) params->source_code->definitions.structs.count++;
-  else params->source_code->implementations.structs.count++;
+  if (data->doubleptr == NULL) {
+    if (status->is_header) params->source_code->definitions.structs.count++;
+    else params->source_code->implementations.structs.count++;
+  }
 
   if (data->members_array != NULL) free(data->members_array);
   free(data);
@@ -687,109 +696,6 @@ static int register_structure(const char * filename, callback_args params, struc
   return 0;
 }
 #undef GET_COUNT
-
-int try_extract_struct(char * buffer, const char * path, callback_args params, struct status_s * status) {
-  struct struct_multiline_status_s * struct_data = NULL;
-
-  while (*buffer == ' ' && *buffer != 0) buffer++;
-  if (starts_with(buffer, "extern") || starts_with(buffer, "static") || starts_with(buffer, "volatile")) { // Skip this word
-    while (*buffer != ' ' && *buffer != 0) buffer++;
-    if (*buffer == 0) goto incomplete;
-
-    while (*buffer == ' ' && *buffer != 0) buffer++;
-    if (*buffer == 0) goto incomplete;
-  }
-  if (!starts_with(buffer, "struct ")) return 1; // This is just not a struct, skipping (unless some madman defined a macro for struct)
-
-  if ((struct_data = malloc(sizeof(struct struct_multiline_status_s))) == NULL) {
-    perror("malloc struct data");
-    params->results.fails++;
-    return 1;
-  }
-  status->data = struct_data;
-
-  struct_data->members_count = 0;
-  struct_data->members_array = NULL;
-  struct_data->reading_members = 0;
-  struct_data->reading_member = 0;
-  struct_data->starts_on_line = status->line_count;
-
-  // This word is "struct", so skip it
-  buffer += 6;
-  while (*buffer == ' ' && *buffer != 0) buffer++;
-  if (*buffer == 0) goto incomplete;
-
-  // The next word is the name
-  ulint i = 0;
-  while (*buffer != ' ' && *buffer != '{' && *buffer != ';' && *buffer != 0) {
-    if (i == ENTITIES_NAME_LENGTH - 1) {
-      fprintf(stderr, "The name of the structure at %s:%lld is too long for the buffer (max: %d caracters)\n", path, status->line_count, ENTITIES_NAME_LENGTH);
-      params->results.fails++;
-      free(struct_data);
-      status->data = NULL;
-      return 1;
-    }
-
-    struct_data->name[i] = *buffer;
-    i++;
-    buffer++;
-  }
-  if (i == 0) goto incomplete;  // Who in their right mind does this ? struct {, struct ;
-  struct_data->name[i] = 0;
-
-  // Go on a simple implementation for now : either look up for a ; immediately after the name (on the same line), or a {\n after the name. We will handle the case if an issue is opened on the project
-  while (*buffer != 0) {
-    if (*buffer == '{') {
-      buffer++;
-      while (*buffer == ' ' && *buffer != 0) buffer++;
-      if (*buffer == '\n') { // Valid, say we are reading multiline and call it a day
-        status->reading_multiline_struct = 1;
-      } else if (*buffer == '}') { // Also valid, but this is an empty structure
-        return register_structure(path, params, status);
-      }
-    }
-    if (*buffer == ' ') {
-      buffer++;
-      continue;
-    }
-    if (*buffer == ';') { // Strange but valid, we can register it now : it is something like struct data; which is valid
-      return register_structure(path, params, status);
-    }
-    if (*buffer == '\n') {
-      status->reading_multiline_struct = 1;
-      return 0; // Let the other function to take the members
-    }
-    // Anything other than these are unwanted, it is either a variable or some obscure ass definition
-    if (struct_data != NULL) {
-      if (struct_data->members_array != NULL) free(struct_data->members_array);
-      free(struct_data);
-      status->data = NULL;
-    }
-    return 1;
-  }
-  if (*buffer == 0) { // Then essentially we have struct name and more spaces on the line, we'll throw an error
-    goto incomplete;
-  }
-
-  if (status->reading_multiline_struct == 0) {
-    return register_structure(path, params, status);
-  }
-  if (struct_data != NULL) {
-    if (struct_data->members_array != NULL) free(struct_data->members_array);
-    free(struct_data);
-  }
-  return 0;
-incomplete:
-  fprintf(stderr, "    /!\\ Incomplete structure definition in %s line %lld\n", path, status->line_count);
-  params->results.fails++;
-  if (struct_data != NULL) {
-    if (struct_data->members_array != NULL) free(struct_data->members_array);
-    free(struct_data);
-    status->data = NULL;
-  }
-  return 1;
-}
-
 static void register_struct_member(char * start, struct struct_multiline_status_s * data) {
   char * typestart = start;
   while (*start != ';') start++; // Just find  the ; and set it to null, just to register it
@@ -816,6 +722,131 @@ static void register_struct_member(char * start, struct struct_multiline_status_
   *start = ';';
   data->members_count++;
 }
+
+int try_extract_struct(char * buffer, const char * path, callback_args params, struct status_s * status) {
+  struct struct_multiline_status_s * struct_data = NULL;
+
+  while (*buffer == ' ' && *buffer != 0) buffer++;
+  if (starts_with(buffer, "extern") || starts_with(buffer, "static") || starts_with(buffer, "volatile")) { // Skip this word
+    while (*buffer != ' ' && *buffer != 0) buffer++;
+    if (*buffer == 0) goto incomplete;
+
+    while (*buffer == ' ' && *buffer != 0) buffer++;
+    if (*buffer == 0) goto incomplete;
+  }
+  if (!starts_with(buffer, "struct ")) return 1; // This is just not a struct, skipping (unless some madman defined a macro for struct)
+
+  if ((struct_data = malloc(sizeof(struct struct_multiline_status_s))) == NULL) {
+    perror("malloc struct data");
+    params->results.fails++;
+    return 1;
+  }
+  status->data = struct_data;
+
+  struct_data->doubleptr = NULL;
+  struct_data->members_count = 0;
+  struct_data->members_array = NULL;
+  struct_data->reading_members = 0;
+  struct_data->reading_member = 0;
+  struct_data->starts_on_line = status->line_count;
+  struct_data->is_pending = 0;
+
+  // This word is "struct", so skip it
+  buffer += 6;
+  while (*buffer == ' ' && *buffer != 0) buffer++;
+  if (*buffer == 0) goto incomplete;
+
+  // The next word is the name
+  ulint i = 0;
+  if (status->automatic) {
+    while (*buffer != ' ' && *buffer != '{' && *buffer != ';' && *buffer != 0) {
+      if (i == ENTITIES_NAME_LENGTH - 1) {
+        fprintf(stderr, "The name of the structure at %s:%lld is too long for the buffer (max: %d caracters)\n", path, status->line_count, ENTITIES_NAME_LENGTH);
+        params->results.fails++;
+        free(struct_data);
+        status->data = NULL;
+        return 1;
+      }
+
+      struct_data->name[i] = *buffer;
+      i++;
+      buffer++;
+    }
+    if (i == 0) goto incomplete;  // Who in their right mind does this ? struct {, struct ;
+  }
+  struct_data->name[i] = 0;
+
+  // Go on a simple implementation for now : either look up for a ; immediately after the name (on the same line), or a {\n after the name. We will handle the case if an issue is opened on the project
+  // Nevermind, since I link using this function and that I remove newlines, we need to handle the case where everything is written on the same line. Copy logic from extract_struct_multiline
+  int registering_member = 0;
+  char * start = buffer;
+  while (*buffer == ' ') buffer++;
+  if (*buffer == ';') { // This is a definition : struct thing;
+    if (!status->automatic) return 0;
+    return register_structure(path, params, status);
+  }
+  // We are where { is
+  while (*buffer != 0) {
+    if (*buffer == '\n') {
+      status->reading_multiline_struct = 1;
+      return 0;
+    }
+    if (struct_data->is_pending) {
+      if (*buffer == '}') {
+        struct_data->is_pending = 0;
+        if (!status->automatic) { // Here we have a following word, but consider it done
+          return 0;
+        }
+        buffer++;
+        continue;
+      }
+      if (!registering_member) {
+        if (*buffer != ' ') {
+          registering_member = 1;
+          start = buffer;
+        }
+      } else {
+        if (*buffer == ';') {
+          register_struct_member(start, struct_data);
+          registering_member = 0;
+          start = buffer + 1;
+        }
+      }
+    } else {
+      // However, here, we allow only spaces, because we are either before {, or between } and ;, and anything between is malformed
+      if (*buffer == '{') {
+        struct_data->is_pending = 1;
+      } else if (*buffer == ';') { // Reached the end
+        if (!status->automatic) return 0;
+        return register_structure(path, params, status);
+      } else if (*buffer != ' ') {
+        goto free;
+      }
+    }
+    buffer++;
+  }
+
+  if (status->reading_multiline_struct == 0) {
+    if (!status->automatic) return 0;
+    return register_structure(path, params, status);
+  }
+  if (struct_data != NULL) {
+    if (struct_data->members_array != NULL) free(struct_data->members_array);
+    free(struct_data);
+  }
+  return 0;
+incomplete:
+  fprintf(stderr, "    /!\\ Incomplete structure definition in %s line %lld\n", path, status->line_count);
+  params->results.fails++;
+free:
+  if (struct_data != NULL) {
+    if (struct_data->members_array != NULL) free(struct_data->members_array);
+    free(struct_data);
+    status->data = NULL;
+  }
+  return 1;
+}
+
 int try_extract_struct_multiline(char * buffer, const char * path, callback_args params, struct status_s * status) {
   struct struct_multiline_status_s * data = status->data;
   // Just read until end of line ig
@@ -849,7 +880,7 @@ int try_extract_struct_multiline(char * buffer, const char * path, callback_args
     }
   }
   if (status->reading_multiline_struct == 0) {
-    return register_structure(path, params, status);
+    if (status->automatic) return register_structure(path, params, status);
   }
   return 0;
 incomplete:
@@ -1603,15 +1634,17 @@ int try_extract_enum(char * buffer, const char * path, callback_args args, struc
   SKIP_BOTH(buffer);
 did_checks: // From there, buffer is expected to be positionned at the beginning of the said name (it might not be the name, but that's where it is supposed to be)
   turtle = buffer;
-  while (*turtle != ' ') turtle++;
-  if (turtle == buffer) {
-    fprintf(stderr, "    /!\\ Invalid enum construction at %s:%lld\n", path, status->line_count);
-    free(data);
-    return 1;
+  if (status->automatic) {
+    while (*turtle != ' ') turtle++;
+    if (turtle == buffer) {
+      fprintf(stderr, "    /!\\ Invalid enum construction at %s:%lld\n", path, status->line_count);
+      free(data);
+      return 1;
+    }
+    *turtle = 0;
+    STRCP(buffer, data->name, ENTITIES_NAME_LENGTH, 1);
+    *turtle = ' ';
   }
-  *turtle = 0;
-  STRCP(buffer, data->name, ENTITIES_NAME_LENGTH, 1);
-  *turtle = ' ';
 
   // Now go through, we expect either '{' or ';'
   SKIP_VOID(turtle);
@@ -1744,11 +1777,15 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
   if (GET_TCOUNT(status->is_header, args->source_code) == 1) free(td);\
 }
 
-static char * obtain_last_word_from_end(char * end) {
+static char * obtain_last_word_from_end(char * end, char * end_char, char ** endpos, char * word_char, char ** wordpos) {
   while (*end != ' ') end--;
   char * word = end + 1;
 
   while (*end == ' ') end--;
+  *end_char = *(end + 1);
+  *endpos = end + 1;
+  *word_char = *(word - 1);
+  *wordpos = word - 1;
   *(end + 1) = 0;
   *(word - 1) = 0;
 
@@ -1851,7 +1888,6 @@ static int register_typedef(const char * path, callback_args args, struct status
       }
       cp--;
     }
-    printf("\n");
     if (start_of_name == NULL) {
       fprintf(stderr, "Failed to parse function name for typedef.\n");
       args->results.fails++;
@@ -1875,8 +1911,15 @@ static int register_typedef(const char * path, callback_args args, struct status
     td->is_function = 1;
   } else {
     td->is_function = 0;
-    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index); // In that case this is fine
+    char end_char;
+    char word_char;
+    char * word_pos;
+    char * end_pos;
+    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index, &end_char, &end_pos, &word_char, &word_pos); // In that case this is fine
     STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
+
+    *word_pos = word_char;
+    *end_pos = end_char;
   }
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
   td->ref->line = data->starts_on_line;
@@ -1920,9 +1963,12 @@ int try_extract_typedef(char * buffer, const char * path, callback_args params, 
   data->buffer_size = 256;
   data->buffer_index = 0;
   data->starts_on_line = status->line_count;
+  data->pending_braces = 0;
 
   while (*buffer != 0 && *buffer != '\n') {
-    if (*buffer == ';') { // We found the end of the typedef
+    if (*buffer == '{') data->pending_braces++;
+    else if (*buffer == '}') data->pending_braces--;
+    if (*buffer == ';' && data->pending_braces == 0) { // We found the end of the typedef
       status->data = data;
       data->buffer[data->buffer_index++] = 0;
       return register_typedef(path, params, status);
@@ -1953,13 +1999,15 @@ int try_extract_typedef_multiline(char * buffer, const char * path, callback_arg
   struct typedef_multiline_status_s * data = status->data;
 
   while (*buffer != 0 && *buffer != '\n') {
-    if (*buffer == ';') { // We found the end of the typedef
+    if (*buffer == '{') data->pending_braces++;
+    else if (*buffer == '}') data->pending_braces--;
+    if (*buffer == ';' && data->pending_braces == 0) { // We found the end of the typedef
       data->buffer[data->buffer_index++] = 0;
       status->reading_multiline_typedef = 0;
       return register_typedef(path, params, status);
     }
 
-    if (*buffer != ' ' || data->buffer_index == 0 || data->buffer[data->buffer_index - 1] == ' ') { // Complex condition, but it is just to not copy 2 consecutive spaces
+    if (data->buffer_index == 0 || *buffer != ' ' || data->buffer[data->buffer_index - 1] != ' '){ // Complex condition, but it is just to not copy 2 consecutive spaces
       if (data->buffer_index == data->buffer_size - 2) { // Keep one for 0
         data->buffer_size *= 2;
         if ((data->buffer = realloc(data->buffer, data->buffer_size)) == NULL) {
