@@ -674,7 +674,7 @@ int register_structure(const char * filename, callback_args params, struct statu
   }
 
   STRCP(data->name, structure->name, ENTITIES_NAME_LENGTH, 1);
-  STRCP((char *)filename, structure->ref->filename, PATH_MAX, 1);
+  rebase_path(filename, params->config->work, params->config->src, structure->ref->filename, PATH_MAX);
   structure->members->count = data->members_count;
   structure->ref->line = data->starts_on_line;
 
