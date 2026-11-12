@@ -98,7 +98,7 @@ static void get_type_location(entity_type_t type, source_code_t code, char * wri
         designation = "na";
         break;
     }
-    size_t index = sprintf(writebuffer, "%ss-%s.md#%s-", designation, locationstr, designation);
+    index = sprintf(writebuffer, "%ss-%s.md#%s-", designation, locationstr, designation);
   }
   size_t i = 0;
   while (name[i] != 0 && i < ENTITIES_NAME_LENGTH) {
@@ -217,24 +217,85 @@ static void generate_functions_page(struct function_indic * functions, source_co
 
   close(fd);
 }
+static void write_primitive_ref(struct primitive_spec * primitive, char * output) {
+  ulint i = 0;
+  while (i < ENTITIES_NAME_LENGTH && primitive->name[i] != 0) {
+    if (primitive->name[i] != ' ') output[i] = primitive->name[i];
+    else output[i] = '-';
+    i++;
+  }
+  output[i] = 0;
+}
+#define PRIMITIVE_DUMP(p, TEST_MACRO, text) if (TEST_MACRO(p->source)) MDDUMP("- " text "");
+static void generate_primitives(MDARGS_T, struct primitives_indic * primitives) {
+  PREPARE;
+  PATHNAME(pathbuf, config, "primitives.md");
+  OPEN(fd, pathbuf, result);
+
+  MDDUMP("# Primitives\nThis file contains all the used primitives in the project\n\n## Defined in this file\nThe following **%zu** primitives are used\n", primitives->count);
+
+  char namebuf[ENTITIES_NAME_LENGTH + 1] = {0};
+  ulint x = 0;
+  while (x < primitives->count) {
+    write_primitive_ref(primitives->array + x, namebuf);
+    MDDUMP("- [`%s`](#primitive-%s)\n", primitives->array[x].name, namebuf);
+    x++;
+  }
+
+  x = 0;
+  while (x < primitives->count) {
+    struct primitive_spec * primitive = primitives->array + x;
+    MDDUMP("### primitive %s\n\n```c\n%s%s\n```\nComes from :\n", primitive->name, primitive->is_structure ? "struct " : "", primitive->name);
+
+    PRIMITIVE_DUMP(primitive, P_TGLIBC, "GLibC");  
+    PRIMITIVE_DUMP(primitive, P_TSTDINT, "stdint.h");
+    PRIMITIVE_DUMP(primitive, P_TFCNTL, "fcntl.h");
+    PRIMITIVE_DUMP(primitive, P_TDIRENT, "dirent.h");
+    PRIMITIVE_DUMP(primitive, P_TLIBSTRINGPGREP, "stringpgrep.h");
+    PRIMITIVE_DUMP(primitive, P_TSTDBOOL, "stdbool.h");
+    PRIMITIVE_DUMP(primitive, P_TSTDDEF, "stddef.h");
+    PRIMITIVE_DUMP(primitive, P_TSTDIO, "stdio.h");
+    PRIMITIVE_DUMP(primitive, P_TSTDLIB, "stdlib.h");
+    PRIMITIVE_DUMP(primitive, P_TSTDTIME, "time.h");
+    PRIMITIVE_DUMP(primitive, P_TSYSDIR, "sys/dir.h");
+    PRIMITIVE_DUMP(primitive, P_TSYSSTAT, "sys/stat.h");
+    PRIMITIVE_DUMP(primitive, P_TSYSTYPES, "sys/types.h");
+    PRIMITIVE_DUMP(primitive, P_TUNISTD, "unistd.h");
+
+    MDDUMP("\n");
+    x++;
+  }
+
+  close(fd);
+}
+#undef PRIMITIVE_DUMP
 static void generate_homepage(MDARGS_T) {
   PREPARE;
   PATHNAME(pathbuf, config, "Home.md");
   OPEN(fd, pathbuf, result);
 
   MDDUMP("# Homepage\n\n## Summary\n\nThis documentation is split between the informations found in header files and source files.\n| Headers | Implementation |\n|:---:|:---:|\n");
-  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |", code->definitions.functions.count, code->implementations.functions.count);
+  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n> See also the [`%zu primitives`](primitives.md)",
+      code->definitions.functions.count,
+      code->implementations.functions.count,
+      code->primitives.count
+  );
 
   close(fd);
 }
 
+/**
+ * Returns 1 if failed 0 otherwise
+ */
 int render(source_code_t code, gen_config_t config, struct result * result) {
+  size_t before = result->fails;
   char buffer[BUFSIZ];
   generate_homepage(MDARGS_V);
 
   generate_functions_page(&(code->definitions.functions), code, config, result, buffer, 1);
   generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
-  return 0;
+  generate_primitives(MDARGS_V, &(code->primitives));
+  return result->fails > before;
 }
 
 #undef MDDUMP
