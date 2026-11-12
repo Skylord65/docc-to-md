@@ -367,7 +367,7 @@ static int link_functions(struct function_indic * functions, source_code_t code,
   while (i < functions->count) {
     struct function_spec * function = functions->array + i;
     if (assign_type(code, function->returntype.string, &(function->returntype)) != 0) {
-      fprintf(stderr, "Cannot assign return type of function %s (return type strinrg is %s)\n", function->name, function->returntype.string);
+      fprintf(stderr, "Cannot assign return type of function %s (return type string is %s)\n", function->name, function->returntype.string);
       args->results.fails++;
       return 1;
     }
@@ -377,8 +377,6 @@ static int link_functions(struct function_indic * functions, source_code_t code,
       struct function_arg * arg = function->args->array + j;
       // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the type of the argument is struct or enum.
       // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
-      if (assign_type(code, function->args->array[j].type.string, &(function->args->array[j].type)) != 0) {
-        fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, function->args->array[j].name, function->args->array[j].type.string);
       char typebuf[ENTITIES_NAME_LENGTH + 8] = {0};
       char * input = arg->type.string;
       if (streq("struct", arg->type.string)) {
@@ -540,10 +538,10 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
         return 1;
       }
       STRCP(td->name, ((struct struct_spec *)status.data)->name, ENTITIES_NAME_LENGTH, 1);
-      struct struct_spec * str = ((struct struct_spec *)status.data);
+      struct struct_multiline_status_s * str = ((struct struct_multiline_status_s *)status.data);
       DEBUG(" Name : " DBG_RED "%s", str->name);
-      DEBUG(" Members : " DBG_YELLOW "%p", str->members);
-      DEBUG(" Number of members : " DBG_LIGHT_RED "%lu", str->members->count);
+      DEBUG(" Members : " DBG_YELLOW "%p", str->members_array);
+      DEBUG(" Number of members : " DBG_LIGHT_RED "%lu", str->members_count);
 
       ((struct struct_multiline_status_s *)(status.data))->doubleptr = (struct struct_spec **)(&td->definition.ptr);
       unsigned long int before = args->results.fails;
@@ -556,6 +554,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       }
       args->results.links++;
       td->definition.type = TypedefinedStructure;
+      DEBUG("members : " DBG_YELLOW "%p", ((struct struct_spec *)td->definition.ptr)->members);
       free(copy);
       return 0;
     }
