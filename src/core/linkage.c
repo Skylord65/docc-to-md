@@ -377,7 +377,7 @@ static int link_functions(struct function_indic * functions, source_code_t code,
       // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the name of the argument is set to struct or enum
       // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
       if (assign_type(code, function->args->array[j].type.string, &(function->args->array[j].type)) != 0) {
-        fprintf(stderr, "Cannot assign type of argument number %lu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, function->args->array[j].name, function->args->array[j].type.string);
+        fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, function->args->array[j].name, function->args->array[j].type.string);
         args->results.fails++;
         return 1;
       }
@@ -396,7 +396,7 @@ static int link_structs(struct struct_indic * structs, source_code_t code, callb
     ulint j = 0;
     while (j < strc->members->count) {
       if (assign_type(code, strc->members->array[j].type.string, &(strc->members->array[j].type)) != 0) {
-        fprintf(stderr, "Cannot assign type to member number %lu (%s) of structure %s\n", j + 1, strc->members->array[j].name, strc->name);
+        fprintf(stderr, "Cannot assign type to member number %zu (%s) of structure %s\n", j + 1, strc->members->array[j].name, strc->name);
         args->results.fails++;
         return 1;
       }
@@ -435,6 +435,7 @@ static int link_variables(struct variables_indic * variables, source_code_t code
  * TODO : also link the resulting types
  */
 static int link_typedef(struct typedef_spec * td, source_code_t code, callback_args args) {
+  (void)code;
   if (td->is_function) { // Don't search, just parse it somehow
     struct status_s status = {
       .reading_function_params = 0,
@@ -448,7 +449,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
     }
 
     ((struct function_multiline_status_s *)(status.data))->doubleptr = (struct function_spec **)(&td->definition.ptr);
-    long long int before = args->results.fails;
+    size_t before = args->results.fails;
     register_function("", args, &status);
     if (args->results.fails > before) {
       fprintf(stderr, "Failed to register function %s for typedef %s\n", td->buffer, td->name);
@@ -480,7 +481,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       }
 
       ((struct enum_multiline_status_s *)(status.data))->doubleptr = (struct enum_spec **)(&td->definition.ptr);
-      long long int before = args->results.fails;
+      size_t before = args->results.fails;
       register_enum("", args, &status);
       if (args->results.fails > before) {
         fprintf(stderr, "Failed to register enum type %s for typedef %s\n", td->buffer, td->name);

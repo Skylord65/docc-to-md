@@ -400,7 +400,7 @@ int try_extract_macro(char * buffer, const char * path, callback_args params, st
 
     // Read arguments for macro
     char * i = parenthesis + 1;
-    char * word = parenthesis + 1;
+    word = parenthesis + 1;
 
     int escape = 0;
     // TODO : this does not support \ in macro parameters yet

@@ -1,7 +1,14 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#include <linux/limits.h>
+#if defined(_WIN32)
+  #include <stdlib.h>
+  #ifndef PATH_MAX
+    #define PATH_MAX _MAX_PATH
+  #endif
+#else
+  #include <limits.h>
+#endif
 
 struct gen_config {
   char src[PATH_MAX];
@@ -12,9 +19,9 @@ struct gen_config {
 typedef struct gen_config * gen_config_t;
 
 struct result {
-  unsigned long int success;
-  unsigned long int fails;
-  unsigned long int links;
+  size_t success;
+  size_t fails;
+  size_t links;
 };
 struct callback_args_s;
 typedef struct callback_args_s * callback_args;
