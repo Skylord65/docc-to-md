@@ -269,15 +269,71 @@ static void generate_primitives(MDARGS_T, struct primitives_indic * primitives) 
   close(fd);
 }
 #undef PRIMITIVE_DUMP
+static void generate_structures_page(MDARGS_T, struct struct_indic * structures, int is_header) {
+  PREPARE;
+  PATHNAME(pathbuf, config, "%s-structures.md", is_header ? "headers" : "source");
+  OPEN(fd, pathbuf, result);
+
+  MDDUMP("# %s structures\n\nThis file contains all the declared structures for the %s\n\n## Defined in this file\n\nThe following **%zu** structures are referenced here\n\n", is_header ? "Headers" : "Source", is_header ? "headers files" : "source files", structures->count);
+
+  ulint i = 0;
+  while (i < structures->count) {
+    struct struct_spec * strc = structures->array + i;
+    MDDUMP("- [`%s`](#structure-%s)\n", strc->name, strc->name);
+
+    i++;
+  }
+
+  char displaybuffer[PATH_MAX];
+  char linkbuffer[PATH_MAX];
+  i = 0;
+  while (i < structures->count) {
+    struct struct_spec * strc = structures->array + i;
+    MDDUMP("### Structure %s\n\n```c\nstruct %s %s\n", strc->name, strc->name, strc->members->count > 0 ? "{" : "{};");
+
+    ulint j = 0;
+    while (j < strc->members->count) {
+      struct struct_member * member = strc->members->array + j;
+      MDDUMP("    ");
+      dump_argument_type(fd, buffer, &(member->type));
+      MDDUMP(" %s;\n", member->name);
+      j++;
+    }
+
+    generate_path_pair(strc->ref->filename, config, displaybuffer, linkbuffer);
+    if (config->gitline) MDDUMP("%s```\nDefined in [%s:%zu](%s#L%zu)\n", strc->members->count > 0 ? "};\n" : "", displaybuffer, strc->ref->line, linkbuffer, strc->ref->line)
+    else MDDUMP("%s```\nDefined in [%s:%zu](%s)\n", strc->members->count > 0 ? "};\n" : "}", displaybuffer, strc->ref->line, linkbuffer);
+
+    if (strc->members->count > 0) {
+      MDDUMP("\n\n#### Members\n");
+      j = 0;
+      while (j < strc->members->count) {
+        struct struct_member * member = strc->members->array + j;
+        get_type_location(member->type, code, displaybuffer);
+        MDDUMP("- **%s** : [`", member->name);
+        dump_argument_type(fd, buffer, &(member->type));
+        MDDUMP("`](%s)\n", displaybuffer);
+
+        j++;
+      }
+    }
+    i++;
+  }
+
+  close(fd);
+}
+
 static void generate_homepage(MDARGS_T) {
   PREPARE;
   PATHNAME(pathbuf, config, "Home.md");
   OPEN(fd, pathbuf, result);
 
   MDDUMP("# Homepage\n\n## Summary\n\nThis documentation is split between the informations found in header files and source files.\n| Headers | Implementation |\n|:---:|:---:|\n");
-  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n> See also the [`%zu primitives`](primitives.md)",
+  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n> See also the [`%zu primitives`](primitives.md)",
       code->definitions.functions.count,
       code->implementations.functions.count,
+      code->definitions.structs.count,
+      code->implementations.structs.count,
       code->primitives.count
   );
 
@@ -294,6 +350,8 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
 
   generate_functions_page(&(code->definitions.functions), code, config, result, buffer, 1);
   generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
+  generate_structures_page(MDARGS_V, &(code->definitions.structs), 1);
+  generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
   generate_primitives(MDARGS_V, &(code->primitives));
   return result->fails > before;
 }
