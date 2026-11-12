@@ -182,7 +182,7 @@ static void dump_macros(ARGS_T, struct macro_indic * macros) {
   ulint i = 0;
   while (i < macros->count) {
     struct macro_spec * macro = macros->array + i;
-    DUMP("Defined in %s:%lu \n#define %s %s", macro->ref->filename, macro->ref->line, macro->name, macro->placeholder);
+    DUMP("Defined in %s:%zu \n#define %s %s", macro->ref->filename, macro->ref->line, macro->name, macro->placeholder);
     DUMP("------- Arguments :");
 
     if (!macro->is_function || macro->args->count == 0) DUMP("   [None]")
@@ -202,7 +202,7 @@ static void dump_variables(ARGS_T, struct variables_indic * variables) {
   ulint i = 0;
   while (i < variables->count) {
     struct variable * variable = variables->array + i;
-    DUMP("Defined in %s:%lu\n  Type: %s\n  Name: %s\n", variable->ref->filename, variable->ref->line, variable->type->string, variable->name)
+    DUMP("Defined in %s:%zu\n  Type: %s\n  Name: %s\n", variable->ref->filename, variable->ref->line, variable->type->string, variable->name)
     i++;
   }
 }
@@ -211,7 +211,7 @@ static void dump_structures(ARGS_T, struct struct_indic * structures) {
   ulint i = 0;
   while (i < structures->count) {
     struct struct_spec * structure = structures->array + i;
-    DUMP("/Structure %s\nDefined in %s:%lu\nstruct %s {", structure->name, structure->ref->filename, structure->ref->line, structure->name);
+    DUMP("/Structure %s\nDefined in %s:%zu\nstruct %s {", structure->name, structure->ref->filename, structure->ref->line, structure->name);
 
     ulint j = 0;
     while (j < structure->members->count) {
@@ -230,7 +230,7 @@ static void dump_structures(ARGS_T, struct struct_indic * structures) {
   }
 }
 static void dump_function(ARGS_T, struct function_spec * function) {
-  DUMP("Defined in %s:%lu\n  NAME: %s\n  Modifiers :", function->ref->filename, function->ref->line, function->name);
+  DUMP("Defined in %s:%zu\n  NAME: %s\n  Modifiers :", function->ref->filename, function->ref->line, function->name);
   if (function->description != NULL) DUMP("--------\n%s\n--------", function->description)
 
   if (F_INONE(function->modifiers)) DUMP("    - [NONE]")
@@ -262,7 +262,7 @@ static void dump_functions(ARGS_T, struct function_indic * functions) {
   }
 }
 static void dump_enum(ARGS_T, struct enum_spec * enumerator) {
-  DUMP("/Enumerator %s\nDefined in %s:%lu\nenum {", enumerator->name, enumerator->ref->filename, enumerator->ref->line);
+  DUMP("/Enumerator %s\nDefined in %s:%zu\nenum {", enumerator->name, enumerator->ref->filename, enumerator->ref->line);
   ulint j = 0;
   while (j < enumerator->members->count) {
     if (j == enumerator->members->count - 1) DUMP("  %s = %s", enumerator->members->array[j].name, enumerator->members->array[j].value)
@@ -288,7 +288,7 @@ static void dump_enums(ARGS_T, struct enum_indic * enums) {
   }
 }
 static void dump_typedef(ARGS_T, struct typedef_spec * spec) {
-  if (spec->buffer != NULL) DUMP("/Typedef %s\nDefined in %s:%lu\ntypedef %s %s\n", spec->name, spec->ref->filename, spec->ref->line, spec->buffer, spec->name);
+  if (spec->buffer != NULL) DUMP("/Typedef %s\nDefined in %s:%zu\ntypedef %s %s\n", spec->name, spec->ref->filename, spec->ref->line, spec->buffer, spec->name);
 }
 static void dump_typedefs(ARGS_T, struct typedef_indic * indic) {
   DUMP("////Typedefs")
@@ -381,7 +381,7 @@ void summarise_parsing(source_code_t code) {
     i++;
   }
 
-  printf("------------------------------------\n- %lu variables registered\n- %lu functions registered (%lu headers + %lu source)\n- %lu macros (%lu headers + %lu source) :",
+  printf("------------------------------------\n- %zu variables registered\n- %zu functions registered (%zu headers + %zu source)\n- %zu macros (%zu headers + %zu source) :",
     code->definitions.variables.count,
     code->definitions.functions.count + code->implementations.functions.count,
     code->definitions.functions.count,
@@ -390,7 +390,7 @@ void summarise_parsing(source_code_t code) {
     code->definitions.macros.count,
     code->implementations.macros.count
   );
-  printf("\n  - %lu functions (%lu headers + %lu source)\n  - %lu variables (%lu headers + %lu source)\n- %lu structures registered (%lu headers + %lu source)",
+  printf("\n  - %zu functions (%zu headers + %zu source)\n  - %zu variables (%zu headers + %zu source)\n- %zu structures registered (%zu headers + %zu source)",
     header_fnt_macro + source_fnt_macro,
     header_fnt_macro,
     source_fnt_macro,
@@ -401,7 +401,7 @@ void summarise_parsing(source_code_t code) {
     code->definitions.structs.count,
     code->implementations.structs.count
   );
-  printf("\n- %lu enumerators registered (%lu headers + %lu source)\n- %lu typedefs registered (%lu headers + %lu source)\n------------------------------------\n",
+  printf("\n- %zu enumerators registered (%zu headers + %zu source)\n- %zu typedefs registered (%zu headers + %zu source)\n------------------------------------\n",
     code->definitions.enums.count + code->implementations.enums.count,
     code->definitions.enums.count,
     code->implementations.enums.count,

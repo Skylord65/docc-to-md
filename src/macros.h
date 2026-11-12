@@ -6,7 +6,7 @@
 #define STRCP(src, dest, max, with_zero) {\
   char * s = src;\
   char * d = dest;\
-  unsigned long i = max;\
+  size_t i = max;\
 \
   while (*s != 0 && i > 0) {\
     i--;\

@@ -4,7 +4,14 @@
 #include "../reader/reader.h"
 #include "config.h"
 
-#include <linux/limits.h>
+#if defined(_WIN32)
+  #include <stdlib.h>
+  #ifndef PATH_MAX
+    #define PATH_MAX _MAX_PATH
+  #endif
+#else
+  #include <limits.h>
+#endif
 #include <unistd.h>
 
 #define IS_STRING_DEL(origin, cptr) (*(cptr) == '"' && (cptr == origin || *(cptr - 1) != '\\'))
