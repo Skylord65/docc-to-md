@@ -1,5 +1,4 @@
 #include "core.h"
-#include "../debug.h"
 #include "../parsers/stringlib.h"
 #include "../parsers/parsers.h"
 #include "../macros.h"
@@ -633,7 +632,6 @@ int register_structure(const char * filename, callback_args params, struct statu
     params->results.fails++;
     return 0;
   }
-  DEBUG("structure->members : " DBG_YELLOW "%p", structure->members);
   structure->members->array = NULL;
   if (data->members_count > 0) {
     if ((structure->members->array = malloc(sizeof(struct struct_member) * data->members_count)) == NULL) {
@@ -1927,7 +1925,6 @@ static int register_typedef(const char * path, callback_args args, struct status
   td->ref->line = data->starts_on_line;
   td->modifiers = data->modifiers;
   STRCP((char *)path, td->ref->filename, PATH_MAX, 1);
-  DEBUG("Final buffer is " DBG_RED "%s", td->buffer);
 
   if (args->config->verbose_registration) printf("- Registering typedef %s\n", td->name);
 

@@ -1,5 +1,4 @@
 #include "core.h"
-#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -479,14 +478,13 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
   char * ptr = td->buffer;
   if (word_eq(ptr, "typedef")) GOTO_NEXTWORD(ptr);
   if (word_eq(ptr, "enum")) {
-    GOTO_NEXTWORD(ptr);
     if (*ptr != '{') { // Here we go and try
       struct status_s status = {
         .reading_multiline_enum = 0,
         .data = NULL,
         .automatic = 0
       };
-      if (try_extract_enum(td->buffer, "", args, &status) == 0 && status.data == NULL) {
+      if (try_extract_enum(ptr, "", args, &status) == 0 || status.data == NULL) {
         fprintf(stderr, "Cannot parse enumerator type of %s for typedef %s\n", td->buffer, td->name);
         args->results.fails++;
         return 1;
@@ -530,7 +528,6 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
         i++;
       }
       copy[writeindex++] = 0;
-      DEBUG("Working with : " DBG_RED " %s", copy);
       if (try_extract_struct(copy, "", args, &status) != 0 && status.data == NULL) {
         fprintf(stderr, "Cannot parse structure type of %s for typedef %s\n", td->buffer, td->name);
         args->results.fails++;
@@ -538,10 +535,6 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
         return 1;
       }
       STRCP(td->name, ((struct struct_spec *)status.data)->name, ENTITIES_NAME_LENGTH, 1);
-      struct struct_multiline_status_s * str = ((struct struct_multiline_status_s *)status.data);
-      DEBUG(" Name : " DBG_RED "%s", str->name);
-      DEBUG(" Members : " DBG_YELLOW "%p", str->members_array);
-      DEBUG(" Number of members : " DBG_LIGHT_RED "%lu", str->members_count);
 
       ((struct struct_multiline_status_s *)(status.data))->doubleptr = (struct struct_spec **)(&td->definition.ptr);
       unsigned long int before = args->results.fails;
@@ -554,7 +547,6 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       }
       args->results.links++;
       td->definition.type = TypedefinedStructure;
-      DEBUG("members : " DBG_YELLOW "%p", ((struct struct_spec *)td->definition.ptr)->members);
       free(copy);
       return 0;
     }
