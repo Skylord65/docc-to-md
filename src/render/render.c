@@ -233,6 +233,7 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_homepage(MDARGS_V);
 
   generate_functions_page(&(code->definitions.functions), code, config, result, buffer, 1);
+  generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
   return 0;
 }
 
