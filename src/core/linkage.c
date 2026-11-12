@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
