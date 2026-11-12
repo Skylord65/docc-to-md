@@ -6,10 +6,10 @@
 #define STRCP(src, dest, max, with_zero) {\
   char * s = src;\
   char * d = dest;\
-  size_t i = max;\
+  size_t __insider_variable_index = max;\
 \
-  while (*s != 0 && i > 0) {\
-    i--;\
+  while (*s != 0 && __insider_variable_index > 0) {\
+    __insider_variable_index--;\
     *d = *s;\
     s++;\
     d++;\
