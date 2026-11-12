@@ -11,6 +11,10 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#ifndef O_BINARY
+  #define O_BINARY 0   /* Linux : sans effet */
+#endif
+
 #define IS_SYS_PATH(str) (*str != 0 && ((*str == '.' && *(str + 1) == 0) || (*str == '.' && *(str + 1) == '.' && *(str + 2) == 0)))
 #define LINE_BUFFER_SIZE 2048
 
@@ -73,12 +77,12 @@ void remove_comments_callback(const char * src, callback_args params) {
     return;
   }
 
-  if ((fd = open(src, O_RDONLY)) == -1) {
+  if ((fd = open(src, O_RDONLY | O_BINARY)) == -1) {
     perror("open");
     params->results.fails++;
     return;
   }
-  if ((outfd = open(outbuf, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+  if ((outfd = open(outbuf, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
     perror("open output file for comments");
     params->results.fails++;
     close(fd);
@@ -137,6 +141,11 @@ void remove_comments_callback(const char * src, callback_args params) {
           index += 2;
           continue;
         }
+      }
+
+      if (buffer[index] == '\r') {   /* normalise CRLF -> LF */
+        index++;
+        continue;
       }
 
       writebuffer[write_count] = buffer[index];
