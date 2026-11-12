@@ -361,61 +361,67 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
   return 0; // Everything went fine
 }
-static int link_functions(struct function_indic * functions, source_code_t code, callback_args args) {
-  ulint i = 0;
-  while (i < functions->count) {
-    struct function_spec * function = functions->array + i;
-    if (assign_type(code, function->returntype.string, &(function->returntype)) != 0) {
-      fprintf(stderr, "Cannot assign return type of function %s (return type string is %s)\n", function->name, function->returntype.string);
+static int link_function(struct function_spec * function, source_code_t code, callback_args args) {
+  if (assign_type(code, function->returntype.string, &(function->returntype)) != 0) {
+    fprintf(stderr, "Cannot assign return type of function %s (return type string is %s)\n", function->name, function->returntype.string);
+    args->results.fails++;
+    return 1;
+  }
+
+  ulint j = 0;
+  while (j < function->args->count) {
+    struct function_arg * arg = function->args->array + j;
+    // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the type of the argument is struct or enum.
+    // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
+    char typebuf[ENTITIES_NAME_LENGTH + 8] = {0};
+    char * input = arg->type.string;
+    if (streq("struct", arg->type.string)) {
+      snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "struct %s", arg->name); // We get struct nameOfStruct
+      input = typebuf;
+    } else if (streq("enum", arg->type.string)) {
+      snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "enum %s", arg->name); // We get eunm NameOfEnum
+      input = typebuf;
+    }
+    if (input != arg->type.string) { // Also replace name of argument and type
+      STRCP(typebuf, arg->type.string, ENTITIES_NAME_LENGTH, 1);
+      snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%lu", j + 1);
+    }
+    if (assign_type(code, input, &(arg->type)) != 0) {
+      fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
       args->results.fails++;
       return 1;
     }
-
-    ulint j = 0;
-    while (j < function->args->count) {
-      struct function_arg * arg = function->args->array + j;
-      // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the type of the argument is struct or enum.
-      // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
-      char typebuf[ENTITIES_NAME_LENGTH + 8] = {0};
-      char * input = arg->type.string;
-      if (streq("struct", arg->type.string)) {
-        snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "struct %s", arg->name); // We get struct nameOfStruct
-        input = typebuf;
-      } else if (streq("enum", arg->type.string)) {
-        snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "enum %s", arg->name); // We get eunm NameOfEnum
-        input = typebuf;
-      }
-      if (input != arg->type.string) { // Also replace name of argument and type
-        STRCP(typebuf, arg->type.string, ENTITIES_NAME_LENGTH, 1);
-        snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%lu", j + 1);
-      }
-      if (assign_type(code, input, &(arg->type)) != 0) {
-        fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
-        args->results.fails++;
-        return 1;
-      }
-      j++;
-    }
-    args->results.links += 1 + function->args->count;
+    j++;
+  }
+  args->results.links += 1 + function->args->count;
+  return 0;
+}
+static int link_functions(struct function_indic * functions, source_code_t code, callback_args args) {
+  ulint i = 0;
+  while (i < functions->count) {
+    link_function(functions->array + i, code, args);
     i++;
   }
 
   return 0;
 }
+static int link_struct(struct struct_spec * strc, source_code_t code, callback_args args) {
+  ulint j = 0;
+  while (j < strc->members->count) {
+    if (assign_type(code, strc->members->array[j].type.string, &(strc->members->array[j].type)) != 0) {
+      fprintf(stderr, "Cannot assign type to member number %zu (%s) of structure %s\n", j + 1, strc->members->array[j].name, strc->name);
+      args->results.fails++;
+      return 1;
+    }
+    j++;
+  }
+  args->results.links += strc->members->count;
+  return 0;
+}
 static int link_structs(struct struct_indic * structs, source_code_t code, callback_args args) {
   ulint i = 0;
   while (i < structs->count) {
-    struct struct_spec * strc = structs->array + i;
-    ulint j = 0;
-    while (j < strc->members->count) {
-      if (assign_type(code, strc->members->array[j].type.string, &(strc->members->array[j].type)) != 0) {
-        fprintf(stderr, "Cannot assign type to member number %zu (%s) of structure %s\n", j + 1, strc->members->array[j].name, strc->name);
-        args->results.fails++;
-        return 1;
-      }
-      j++;
-    }
-    args->results.links += strc->members->count;
+    link_struct(structs->array + i, code, args);
     i++;
   }
   return 0;
@@ -563,7 +569,22 @@ static int link_typedefs(struct typedef_indic * typedefs, source_code_t code, ca
   }
   return 0;
 }
+#define CHECK(instruction) {\
+  if (instruction != 0) return 1;\
+}
+static int link_typedefs_result(struct typedef_indic * typedefs, source_code_t code, callback_args args) {
+  ulint i = 0;
+  while (i < typedefs->count) {
+    struct typedef_spec * td = typedefs->array + i;
+    if (td->definition.type == TypedefinedStructure) CHECK(link_struct(td->definition.ptr, code, args))
+    else if (td->definition.type == TypedefinedFunction) CHECK(link_function(td->definition.ptr, code, args))
+    i++;
+  }
+  return 0;
+}
+#undef CHECK
 int linkage(source_code_t code, callback_args args) {
+  size_t before = args->results.fails;
   link_functions(&(code->definitions.functions), code, args);
   link_functions(&(code->implementations.functions), code, args);
   link_structs(&(code->definitions.structs), code, args);
@@ -571,6 +592,10 @@ int linkage(source_code_t code, callback_args args) {
   link_typedefs(&(code->definitions.typedefs), code, args);
   link_typedefs(&(code->implementations.typedefs), code, args);
   link_variables(&(code->definitions.variables), code, args);
-  return 0;
+
+  link_typedefs_result(&(code->definitions.typedefs), code, args);
+  link_typedefs_result(&(code->implementations.typedefs), code, args);
+
+  return args->results.fails <= before;
 }
 #undef GOTO_NEXTWORD
