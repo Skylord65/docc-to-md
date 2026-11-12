@@ -26,6 +26,12 @@ target_compile_definitions(uwu PRIVATE
   $<$<AND:$<CONFIG:Release>,$<BOOL:${UWU_DISABLE_DEBUG}>>:DISABLE_DEBUG=${UWU_DISABLE_DEBUG}>)
 
 if(MSVC)
+  target_compile_definitions(uwu PRIVATE
+    _CRT_SECURE_NO_WARNINGS
+    _CRT_NONSTDC_NO_DEPRECATE)          # silence strdup/open/... (C4996)
+  target_compile_options(uwu PRIVATE
+    "/FI${CMAKE_SOURCE_DIR}/compat/win32/posix_compat.h")
+  target_include_directories(uwu PRIVATE SYSTEM "${CMAKE_SOURCE_DIR}/compat/win32")
   target_compile_options(uwu PRIVATE /W4 /utf-8
     $<$<BOOL:${UWU_WERROR}>:/WX>
     $<$<CONFIG:Release>:/O2>)
