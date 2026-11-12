@@ -148,6 +148,34 @@ static struct struct_spec * try_parse_structure(char * input, source_code_t code
 
   return NULL;
 }
+static struct typedef_spec * identify_typedef(char * input, source_code_t code, char ** restptr) {
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
+  if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
+
+  char * end = input;
+  while (*end != ' ' && *end != 0) end++;
+  int changed = *end == ' ';
+  *end = 0;
+  *restptr = end;
+  ulint i = 0;
+  while (i < code->definitions.typedefs.count) {
+    if (streq(code->definitions.typedefs.array[i].name, input)) {
+      if (changed) *end = ' ';
+      return code->definitions.typedefs.array + i;
+    }
+    i++;
+  }
+  i = 0;
+  while (i < code->implementations.typedefs.count) {
+    if (streq(code->implementations.typedefs.array[i].name, input)) {
+      if (changed) *end = ' ';
+      return code->implementations.typedefs.array + i;
+    }
+    i++;
+  }
+  if (changed) *end = ' ';
+  return NULL;
+}
 static struct primitive_spec * try_parse_primitive_structure(char * input, source_code_t code, char ** restptr) {
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
@@ -311,7 +339,7 @@ static void init_primitive_data(struct register_primitive_data * p) {
   p->buffer[0] = 0;
 }
 static int preparing(source_code_t code, char * input, entity_type_t * type) {
-struct register_primitive_data data;
+  struct register_primitive_data data;
 
   init_primitive_data(&data);
 
@@ -355,6 +383,10 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
     type->type = MacroType;
   } else if ((type->ptr = try_parse_structure(input, code, &input_rest)) != NULL) {
     type->type = StructureType;
+    if (compute_rest_of_type(input_rest, type) != 0) return 1;
+    return 0;
+  } else if ((type->ptr = identify_typedef(input, code, &input_rest)) != NULL) {
+    type->type = TypedefType;
     if (compute_rest_of_type(input_rest, type) != 0) return 1;
     return 0;
   } else if ((type->ptr = try_parse_primitive_structure(input, code, &input_rest)) != NULL) {
