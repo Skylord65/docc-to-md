@@ -69,11 +69,7 @@ int normalize_type_string(const char * type, char * typebuf, int with_replace_ne
 
   return 0;
 }
-/*
- * This function replaces in `path` the source `replace` by the new path `by`.
- * It writes in buffer as the function goes by
- */
-static void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max) {
+void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max) {
   unsigned i = 0;
   unsigned bufindex = 0;
   while (path[i] == replace[i] && i < max) i++;
