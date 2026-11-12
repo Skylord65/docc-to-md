@@ -70,6 +70,7 @@ struct struct_multiline_status_s {
   ulint starts_on_line;
   int reading_members;
   int reading_member;
+  char is_pending;
   ulint members_count;
   struct struct_spec ** doubleptr;
   char ** members_array; // Store them as string, keep the computing when we are sure it is complete
@@ -109,6 +110,7 @@ struct typedef_multiline_status_s {
   unsigned long int buffer_index;
   char * buffer;
   fnt_modifier modifiers;
+  unsigned int pending_braces;
 };
 
 extern int normalize_type_string(const char * type, char * typebuf, int with_normalize_newline);
@@ -129,5 +131,6 @@ extern int linkage(source_code_t code, callback_args args);
 // Some registering functions
 void register_function(const char * path, callback_args params, struct status_s * status);
 void register_enum(const char * path, callback_args args, struct status_s * status);
+int register_structure(const char * filename, callback_args params, struct status_s * status);
 
 #endif

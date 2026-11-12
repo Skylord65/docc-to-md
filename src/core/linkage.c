@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -502,6 +503,58 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
 
       args->results.links++;
       td->definition.type = TypedefinedEnum;
+      return 0;
+    }
+  }
+  if (word_eq(ptr, "struct")) {
+    GOTO_NEXTWORD(ptr);
+    if (*ptr == '{') {
+      struct status_s status = {
+        .reading_multiline_struct = 0,
+        .data = NULL,
+        .automatic = 0
+      };
+      // We need to remove trailing newlines
+      char * copy;
+      if ((copy = malloc(sizeof(char) * (strlen(td->buffer) + 1))) == NULL) {
+        perror("malloc working copy of structure");
+        args->results.fails++;
+        return 1;
+      }
+      STRCP("struct ", copy, 7, 0);
+      ulint i = 0;
+      ulint writeindex = 7;
+      while (ptr[i] != 0) {
+        if (ptr[i] != '\n') copy[writeindex++] = ptr[i];
+        else copy[writeindex++] = ' ';
+        i++;
+      }
+      copy[writeindex++] = 0;
+      DEBUG("Working with : " DBG_RED " %s", copy);
+      if (try_extract_struct(copy, "", args, &status) != 0 && status.data == NULL) {
+        fprintf(stderr, "Cannot parse structure type of %s for typedef %s\n", td->buffer, td->name);
+        args->results.fails++;
+        free(copy);
+        return 1;
+      }
+      STRCP(td->name, ((struct struct_spec *)status.data)->name, ENTITIES_NAME_LENGTH, 1);
+      struct struct_spec * str = ((struct struct_spec *)status.data);
+      DEBUG(" Name : " DBG_RED "%s", str->name);
+      DEBUG(" Members : " DBG_YELLOW "%p", str->members);
+      DEBUG(" Number of members : " DBG_LIGHT_RED "%lu", str->members->count);
+
+      ((struct struct_multiline_status_s *)(status.data))->doubleptr = (struct struct_spec **)(&td->definition.ptr);
+      unsigned long int before = args->results.fails;
+      register_structure("", args, &status);
+      if (args->results.fails > before) {
+        fprintf(stderr, "Failed to register structure type %s for typedef %s\n", td->buffer, td->name);
+        args->results.fails++;
+        free(copy);
+        return 1;
+      }
+      args->results.links++;
+      td->definition.type = TypedefinedStructure;
+      free(copy);
       return 0;
     }
   }
