@@ -373,10 +373,24 @@ static int link_functions(struct function_indic * functions, source_code_t code,
 
     ulint j = 0;
     while (j < function->args->count) {
-      // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the name of the argument is set to struct or enum
+      struct function_arg * arg = function->args->array + j;
+      // Once again, we have edge cases : if the argument is unamed. It can only mean it is a structure or an enum, since we made sure that would be the case, and if that's the case, the type of the argument is struct or enum.
       // The strategy is : check if that's the case, if so, we snprintf it into a buffer and use the buffer instead of the .type.string
-      if (assign_type(code, function->args->array[j].type.string, &(function->args->array[j].type)) != 0) {
-        fprintf(stderr, "Cannot assign type of argument number %zu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, function->args->array[j].name, function->args->array[j].type.string);
+      char typebuf[ENTITIES_NAME_LENGTH + 8] = {0};
+      char * input = arg->type.string;
+      if (streq("struct", arg->type.string)) {
+        snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "struct %s", arg->name); // We get struct nameOfStruct
+        input = typebuf;
+      } else if (streq("enum", arg->type.string)) {
+        snprintf(typebuf, ENTITIES_NAME_LENGTH + 8, "enum %s", arg->name); // We get eunm NameOfEnum
+        input = typebuf;
+      }
+      if (input != arg->type.string) { // Also replace name of argument and type
+        STRCP(typebuf, arg->type.string, ENTITIES_NAME_LENGTH, 1);
+        snprintf(arg->name, ENTITIES_NAME_LENGTH, "__arg_no_%lu", j + 1);
+      }
+      if (assign_type(code, input, &(arg->type)) != 0) {
+        fprintf(stderr, "Cannot assign type of argument number %lu of function %s (argument is %s, its type is %s)\n", j + 1, function->name, arg->name, arg->type.string);
         args->results.fails++;
         return 1;
       }
