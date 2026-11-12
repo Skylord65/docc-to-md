@@ -2,7 +2,14 @@
 #include "../parsers/stringlib.h"
 #include "../parsers/parsers.h"
 #include "../macros.h"
-#include <linux/limits.h>
+#if defined(_WIN32)
+  #include <stdlib.h>
+  #ifndef PATH_MAX
+    #define PATH_MAX _MAX_PATH
+  #endif
+#else
+  #include <limits.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -326,7 +333,7 @@ static int register_macro(const char * path, callback_args params, struct status
   macro->ref->line = data->starts_on_line;
   rebase_path(path, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
 
-  if (params->config->verbose_registration) printf("- Registering macro %s (%lu arguments)\n", macro->name, macro->is_function ? macro->args->count : 0);
+  if (params->config->verbose_registration) printf("- Registering macro %s (%zu arguments)\n", macro->name, macro->is_function ? macro->args->count : 0);
 
   free(status->data);
   status->data = NULL;
@@ -393,7 +400,7 @@ int try_extract_macro(char * buffer, const char * path, callback_args params, st
 
     // Read arguments for macro
     char * i = parenthesis + 1;
-    char * word = parenthesis + 1;
+    word = parenthesis + 1;
 
     int escape = 0;
     // TODO : this does not support \ in macro parameters yet
@@ -675,7 +682,7 @@ static int register_structure(const char * filename, callback_args params, struc
   free(data);
   status->data = NULL;
 
-  if (params->config->verbose_registration) printf("- Registering structure %s (%lu members)\n", structure->name, structure->members->count);
+  if (params->config->verbose_registration) printf("- Registering structure %s (%zu members)\n", structure->name, structure->members->count);
 
   return 0;
 }
@@ -992,7 +999,7 @@ almost_complete_fail:
       if (var_name == input || *var_name == '*') { // That's the case when we have only 1 word, so it has to be a type
                                                    // Or the case when it is a pointer
         char namebuf[ENTITIES_NAME_LENGTH];
-        snprintf(namebuf, ENTITIES_NAME_LENGTH, "__arg_no_%lu", i + 1);
+        snprintf(namebuf, ENTITIES_NAME_LENGTH, "__arg_no_%zu", i + 1);
         var_name = namebuf;
         replaced = 1;
       }
@@ -1036,7 +1043,7 @@ if_exit:
 
   FREE_DATA(status, data);
 
-  if (params->config->verbose_registration) printf("- Registering function %s (%lu arguments)\n", function->name, function->args->count);
+  if (params->config->verbose_registration) printf("- Registering function %s (%zu arguments)\n", function->name, function->args->count);
 
   return;
 }
@@ -1404,7 +1411,7 @@ void register_enum(const char * path, callback_args args, struct status_s * stat
   STRCP(data->name, enumerator->name, ENTITIES_NAME_LENGTH, 1);
   STRCP((char *)path, enumerator->ref->filename, PATH_MAX, 1);
 
-  if (args->config->verbose_registration) printf("- Registering enumerator %s (%lu members)\n", enumerator->name, enumerator->members->count);
+  if (args->config->verbose_registration) printf("- Registering enumerator %s (%zu members)\n", enumerator->name, enumerator->members->count);
 
   free(data);
   status->data = NULL;

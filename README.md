@@ -16,6 +16,13 @@ make cleanbuild
 sudo mv bin/main.uwu /usr/bin/docc-to-md
 ```
 
+or :
+```bash
+git clone https://git.greeensky.tf/docc-to-md && cd docc-to-md
+cmake CMakeLists.txt
+make -f Makefile
+```
+
 ### From PKGBUILD (arch)
 
 If you are using arch, you can install it through the PKGBUILD file :

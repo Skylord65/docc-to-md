@@ -2,12 +2,20 @@
 #define __READER_H__
 
 #include "../core/config.h"
-#include <linux/limits.h>
+#if defined(_WIN32)
+  #include <stdlib.h>
+  #ifndef PATH_MAX
+    #define PATH_MAX _MAX_PATH
+  #endif
+#else
+  #include <limits.h>
+#endif
+#include <stddef.h>
 
 #define ENTITIES_NAME_LENGTH 64
 #define MACRO_PLACEHOLDER_LENGTH 2048
 
-typedef unsigned long int ulint;
+typedef size_t ulint;
 typedef char fnt_modifier;
 
 #define F_MSTATIC 0x00000001

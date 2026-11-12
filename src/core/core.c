@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/dir.h>
+#include <dirent.h>
 #include <sys/stat.h>
 
 #define IS_SYS_PATH(str) (*str != 0 && ((*str == '.' && *(str + 1) == 0) || (*str == '.' && *(str + 1) == '.' && *(str + 2) == 0)))
@@ -422,7 +422,7 @@ void register_doccumments_callback(const char * src, callback_args params) {
       else {
         if (*ptr == '/' && *(ptr + 1) == '*') {
           in_multiline_comment = 1;
-          multiline_start = ftell(stream) - strlen(buffer);
+          multiline_start = (long)(ftell(stream) - strlen(buffer));
           continue;
         }
       }
