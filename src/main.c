@@ -2,6 +2,7 @@
 #include "reader/reader.h"
 #include "core/core.h"
 #include "parsers/args.h"
+#include "render/rendering.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -103,6 +104,8 @@ int main(int argc, char * argv[]) {
   summarise_linking(&callback_args);
 
   dump(callback_args.source_code, args[5], args[6]);
+
+  render(callback_args.source_code, &config, &(callback_args.results));
 
   cleanup(&config);
   free_source_code(callback_args.source_code);

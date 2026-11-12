@@ -23,6 +23,7 @@ struct result {
   size_t success;
   size_t fails;
   size_t links;
+  size_t files_written;
 };
 struct callback_args_s;
 typedef struct callback_args_s * callback_args;
