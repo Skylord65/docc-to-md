@@ -51,7 +51,8 @@ int main(int argc, char * argv[]) {
     { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL },
     { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL },
     { "--enable-commentdoc", "Enable the registration of doc comments for functions", Presence, 0, 0, NULL },
-    { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL }
+    { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL },
+    { "--git-line", "Add the matching line like git would do in file reference", Presence, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -75,6 +76,7 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   config.verbose_registration = args[7].found;
+  config.gitline = args[10].found;
 
   struct callback_args_s callback_args = {
     .config = &config,

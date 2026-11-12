@@ -19,6 +19,7 @@ struct gen_config {
   char * srcdirname;
   int verbose_registration;
   char * rebase_prefix;
+  char gitline;
 };
 typedef struct gen_config * gen_config_t;
 
