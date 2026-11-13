@@ -1,0 +1,55 @@
+name: Check the syntax of the pull request when it's opened
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+
+jobs:
+  check-pr-branch:
+    name: Check PR branch
+    runs-on: arch
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Modify makefile
+        id: makefile
+        run: |
+          set -eup pipefail
+
+          sed -i 's/\(FLAGS=.*\)/\1 -Werror/' makefile
+          sed -i 's/\(CLEANBUILD_FLAGS=.*\)/\1 -Werror/' makefile
+          sed -i 's/ ?-DNODEBUG//' makefile
+
+      - name: Check if code compiles
+        run: |
+          make DEBUG=1
+          make clean
+          make cleanbuild DEBUG=1
+
+  check-merge-result:
+    name: Check merge result
+    runs-on: arch
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Modify makefile
+        id: makefile
+        run: |
+          set -euo pipefail
+
+          sed -i 's/\(FLAGS=.*\)/\1 -Werror/' makefile
+          sed -i 's/\(CLEANBUILD_FLAGS=.*\)/\1 -Werror/' makefile
+          sed -i 's/ ?-DNODEBUG//' makefile
+
+      - name: Check if code compiles
+        run: |
+          make DEBUG=1
+          make clean
+          make cleanbuild DEBUG=1
+
