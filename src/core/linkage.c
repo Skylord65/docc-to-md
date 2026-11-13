@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -548,6 +549,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
 
 
   if (td->is_function) { // Don't search, just parse it somehow
+    DEBUG("Looking to parse function " DBG_LIGHT_REDT("%s"), td->name);
     struct status_s status = {
       .reading_function_params = 0,
       .data = NULL,

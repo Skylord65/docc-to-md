@@ -1,8 +1,10 @@
 #include "rendering.h"
+#include "../debug.h"
 #include "../macros.h"
 #include "../core/core.h"
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #define MDARGS_T source_code_t code, gen_config_t config, struct result * result, char * buffer
@@ -162,6 +164,16 @@ static void generate_path_pair(const char * filename, gen_config_t config, char 
     rebase_path(filename, config->srcdirname, config->rebase_prefix, linkbuffer, PATH_MAX);
   }
 }
+static void dump_function_type(int fd, char * buffer, struct function_spec * fnt) {
+  dump_argument_type(fd, buffer, &(fnt->returntype));
+  MDDUMP(" %s(", fnt->name);
+  ulint x = 0;
+  while (x < fnt->args->count) {
+    dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
+    MDDUMP(" %s%s", fnt->args->array[x].name, x + 1 < fnt->args->count ? ", " : ")");
+    x++;
+  }
+}
 static void generate_functions_page(struct function_indic * functions, source_code_t code, gen_config_t config, struct result * result, char * buffer, int is_header) {
   PREPARE;
   PATHNAME(pathbuf, config, "%s-functions.md", is_header ? "headers" : "source");
@@ -179,21 +191,14 @@ static void generate_functions_page(struct function_indic * functions, source_co
   while (j < functions->count) {
     struct function_spec * fnt = functions->array + j;
     MDDUMP("\n### function %s\n\n```c\n", fnt->name);
-    dump_argument_type(fd, buffer, &(fnt->returntype));
-    MDDUMP(" %s(", fnt->name);
 
-    ulint x = 0;
-    while (x < fnt->args->count) {
-      dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
-      MDDUMP(" %s%s", fnt->args->array[x].name, x + 1 < fnt->args->count ? ", " : ");");
-      x++;
-    }
+    dump_function_type(fd, buffer, fnt);
 
     char displaypath[PATH_MAX];
     char linkpath[PATH_MAX];
     generate_path_pair(fnt->ref->filename, config, displaypath, linkpath);
-    if (config->gitline) MDDUMP("\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaypath, fnt->ref->line, linkpath, fnt->ref->line)
-    else MDDUMP("\n```\nDefined in [%s:%zu](%s)\n", displaypath, fnt->ref->line, linkpath);
+    if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaypath, fnt->ref->line, linkpath, fnt->ref->line)
+    else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n", displaypath, fnt->ref->line, linkpath);
 
     if (fnt->description != NULL) MDDUMP("#### Note\n\n```\n%s```\n", fnt->description);
 
@@ -203,7 +208,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
     get_type_location(fnt->returntype, code, displaypath);
     MDDUMP("`](%s)\n#### Arguments\n\n%s", displaypath, fnt->args->count == 0 ? "*No arguments*" : "");
 
-    x = 0;
+    ulint x = 0;
     while (x < fnt->args->count) {
       MDDUMP("%zu. **%s** : [`", x + 1, fnt->args->array[x].name);
       dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
@@ -269,6 +274,20 @@ static void generate_primitives(gen_config_t config, struct result *result, char
   close(fd);
 }
 #undef PRIMITIVE_DUMP
+static void dump_structure_signature(int fd, char * buffer, struct struct_spec * strc, char dump_name) {
+  if (dump_name == 1) MDDUMP("struct %s {%s", strc->name, strc->members->count > 0 ? "\n" : "")
+  else MDDUMP("struct {%s", strc->members->count > 0 ? "\n" : "");
+
+  ulint x = 0;
+  while (x < strc->members->count) {
+    struct struct_member * member = strc->members->array + x;
+    MDDUMP("    ");
+    dump_argument_type(fd, buffer, &(member->type));
+    MDDUMP(";\n");
+    x++;
+  }
+  MDDUMP("}");
+}
 static void generate_structures_page(MDARGS_T, struct struct_indic * structures, int is_header) {
   PREPARE;
   PATHNAME(pathbuf, config, "%s-structures.md", is_header ? "headers" : "source");
@@ -289,24 +308,17 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
   i = 0;
   while (i < structures->count) {
     struct struct_spec * strc = structures->array + i;
-    MDDUMP("### Structure %s\n\n```c\nstruct %s %s\n", strc->name, strc->name, strc->members->count > 0 ? "{" : "{};");
+    MDDUMP("### Structure %s\n\n```c\n", strc->name);
 
-    ulint j = 0;
-    while (j < strc->members->count) {
-      struct struct_member * member = strc->members->array + j;
-      MDDUMP("    ");
-      dump_argument_type(fd, buffer, &(member->type));
-      MDDUMP(" %s;\n", member->name);
-      j++;
-    }
+    dump_structure_signature(fd, buffer, strc, 1);
 
     generate_path_pair(strc->ref->filename, config, displaybuffer, linkbuffer);
-    if (config->gitline) MDDUMP("%s```\nDefined in [%s:%zu](%s#L%zu)\n", strc->members->count > 0 ? "};\n" : "", displaybuffer, strc->ref->line, linkbuffer, strc->ref->line)
-    else MDDUMP("%s```\nDefined in [%s:%zu](%s)\n", strc->members->count > 0 ? "};\n" : "}", displaybuffer, strc->ref->line, linkbuffer);
+    if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaybuffer, strc->ref->line, linkbuffer, strc->ref->line)
+    else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n", displaybuffer, strc->ref->line, linkbuffer);
 
     if (strc->members->count > 0) {
       MDDUMP("\n\n#### Members\n");
-      j = 0;
+      ulint j = 0;
       while (j < strc->members->count) {
         struct struct_member * member = strc->members->array + j;
         get_type_location(member->type, code, displaybuffer);
@@ -322,6 +334,85 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
 
   close(fd);
 }
+static void dump_enumerator_signature(int fd, char * buffer, struct enum_spec * enumerator, const char dump_name) {
+  MDDUMP("enum%s {%s", dump_name == 1 ? enumerator->name : "", enumerator->members->count > 0 ? "\n" : "");
+
+  size_t max = 0;
+  ulint x = 0;
+  while (x < enumerator->members->count) {
+    size_t len = strlen(enumerator->members->array[x].name);
+    if (len > max) max = len;
+    x++;
+  }
+  char template[32];
+  sprintf(template, "    %%-%zus = %%s%%s\n", max);
+  x = 0;
+  while (x < enumerator->members->count) {
+    MDDUMP(template, enumerator->members->array[x].name, enumerator->members->array[x].value, x + 1 < enumerator->members->count ? "," : "");
+    x++;
+  }
+
+  MDDUMP("}");
+}
+static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buffer) {
+  if (td->definition.ptr == NULL) return;
+
+  switch (td->definition.type) {
+    case NoneType:
+    case MacroType:
+    case TypedefType: // If someone does typedef typedef I kill them
+      break;
+    case PrimitiveType:
+      dump_argument_type(fd, buffer, &(td->definition));
+      MDDUMP(" %s;", td->name);
+      break;
+    case TypedefinedFunction:
+    case FunctionType:
+      dump_function_type(fd, buffer, (struct function_spec *)td->definition.ptr);
+      break;
+    case TypedefinedEnum:
+    case EnumeratorType:
+      dump_enumerator_signature(fd, buffer, (struct enum_spec *)td->definition.ptr, 0);
+      MDDUMP(" %s", td->name);
+      break;
+    case StructureType:
+    case TypedefinedStructure:
+      dump_structure_signature(fd, buffer, (struct struct_spec *)td->definition.ptr, 0);
+      MDDUMP(" %s", td->name);
+      break;
+  }
+}
+static void generate_typedefs_page(MDARGS_T, struct typedef_indic * tds, int is_header) {
+  PREPARE;
+  PATHNAME(pathbuf, config, "%s-typedefs.md", is_header ? "headers" : "source");
+  OPEN(fd, pathbuf, result);
+
+  ulint i = 0;
+  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files\n\nDefined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", tds->count);
+
+  while (i < tds->count) {
+    struct typedef_spec * td = tds->array + i;
+    MDDUMP("- [%s](#typedef-%s)\n", td->name, td->name);
+    i++;
+  }
+
+  char linkpath[PATH_MAX];
+  char displaypath[PATH_MAX];
+  i = 0;
+  while (i < tds->count) {
+    struct typedef_spec * td = tds->array + i;
+    MDDUMP("### typedef %s\n```c\ntypedef ", td->name);
+
+    dump_typedef_definition(td, fd, buffer);
+
+    generate_path_pair(td->ref->filename, config, displaypath, linkpath);
+    if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaypath, td->ref->line, linkpath, td->ref->line)
+    else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n", displaypath, td->ref->line, linkpath);
+    i++;
+  }
+
+  close(fd);
+}
 
 static void generate_homepage(MDARGS_T) {
   PREPARE;
@@ -329,11 +420,13 @@ static void generate_homepage(MDARGS_T) {
   OPEN(fd, pathbuf, result);
 
   MDDUMP("# Homepage\n\n## Summary\n\nThis documentation is split between the informations found in header files and source files.\n| Headers | Implementation |\n|:---:|:---:|\n");
-  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n> See also the [`%zu primitives`](primitives.md)",
+  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n| [`typedefs (%zu)`](headers-typedefs.md) | [`typedefs (%zu)`](source-typedefs) |\n> See also the [`%zu primitives`](primitives.md)",
       code->definitions.functions.count,
       code->implementations.functions.count,
       code->definitions.structs.count,
       code->implementations.structs.count,
+      code->definitions.typedefs.count,
+      code->implementations.typedefs.count,
       code->primitives.count
   );
 
@@ -352,6 +445,8 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
   generate_structures_page(MDARGS_V, &(code->definitions.structs), 1);
   generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
+  generate_typedefs_page(MDARGS_V, &(code->definitions.typedefs), 1);
+  generate_typedefs_page(MDARGS_V, &(code->implementations.typedefs), 0);
   generate_primitives(config, result, buffer, &(code->primitives));
   return result->fails > before;
 }
