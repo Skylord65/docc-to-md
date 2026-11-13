@@ -381,7 +381,7 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
       break;
   }
 }
-static void generate_typedefs_page(MDARGS_T, struct typedef_indic * tds, int is_header) {
+static void generate_typedefs_page(gen_config_t config, struct result *result, char *buffer, struct typedef_indic *tds, int is_header) {
   PREPARE;
   PATHNAME(pathbuf, config, "%s-typedefs.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
@@ -422,7 +422,7 @@ static void write_macro_ref(struct macro_spec * macro, char * buf) {
   }
   buf[index++] = 0;
 }
-static void generate_macros_page(MDARGS_T, struct macro_indic * macros, int is_header) {
+static void generate_macros_page(gen_config_t config, struct result *result, char *buffer, struct macro_indic *macros, int is_header) {
   PREPARE;
   PATHNAME(pathbuf, config, "%s-macros.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
@@ -495,10 +495,10 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
   generate_structures_page(MDARGS_V, &(code->definitions.structs), 1);
   generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
-  generate_typedefs_page(MDARGS_V, &(code->definitions.typedefs), 1);
-  generate_typedefs_page(MDARGS_V, &(code->implementations.typedefs), 0);
-  generate_macros_page(MDARGS_V, &(code->definitions.macros), 1);
-  generate_macros_page(MDARGS_V, &(code->implementations.macros), 0);
+  generate_typedefs_page(config, result, buffer, &(code->definitions.typedefs), 1);
+  generate_typedefs_page(config, result, buffer, &(code->implementations.typedefs), 0);
+  generate_macros_page(config, result, buffer, &(code->definitions.macros), 1);
+  generate_macros_page(config, result, buffer, &(code->implementations.macros), 0);
   generate_primitives(config, result, buffer, &(code->primitives));
   return result->fails > before;
 }

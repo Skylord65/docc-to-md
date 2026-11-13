@@ -1,5 +1,4 @@
 #include "core.h"
-#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -549,7 +548,6 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
 
 
   if (td->is_function) { // Don't search, just parse it somehow
-    DEBUG("Looking to parse function " DBG_LIGHT_REDT("%s"), td->name);
     struct status_s status = {
       .reading_function_params = 0,
       .data = NULL,
@@ -757,12 +755,11 @@ static int prepare_variables(struct variables_indic * variables, source_code_t c
   args->results.links += variables->count;
   return 0;
 }
-static int prepare_typedefs(struct typedef_indic * tds, source_code_t code, callback_args args) {
+static int prepare_typedefs(struct typedef_indic * tds, source_code_t code) {
   struct register_primitive_data data;
   init_primitive_data(&data);
 
   char * input_rest = NULL;
-  void * res;
   ulint i = 0;
   while (i < tds->count) {
     struct typedef_spec * td = tds->array + i;
@@ -807,8 +804,8 @@ static int prepare_linkage(source_code_t code, callback_args args) {
   prepare_structs(&(code->definitions.structs), code, args);
   prepare_structs(&(code->implementations.structs), code, args);
   prepare_variables(&(code->definitions.variables), code, args);
-  prepare_typedefs(&(code->definitions.typedefs), code, args);
-  prepare_typedefs(&(code->implementations.typedefs), code, args);
+  prepare_typedefs(&(code->definitions.typedefs), code);
+  prepare_typedefs(&(code->implementations.typedefs), code);
   return 0;
 }
 int linkage(source_code_t code, callback_args args) {
