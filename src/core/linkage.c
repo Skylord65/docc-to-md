@@ -504,7 +504,48 @@ static int link_variables(struct variables_indic * variables, source_code_t code
  * typedef struct filestream * stream_p;
  */
 static int link_typedef(struct typedef_spec * td, source_code_t code, callback_args args) {
-  (void)code;
+  struct register_primitive_data data;
+  init_primitive_data(&data);
+
+  // Work the buffer to give the correct input to assign_type
+  char * bufptr = td->buffer;
+  char * input_rest;
+  GOTO_NEXTWORD(bufptr); // We have typedef as first word
+                         // Find the last space and replace it by a 0
+  char * last_space = NULL;
+  char * ptrcp = bufptr;
+  while (*ptrcp != 0) {
+    if (*ptrcp == ' ') last_space = ptrcp;
+    ptrcp++;
+  }
+  if (last_space != NULL) last_space = 0;
+  if (try_parse_primitive(bufptr, &data, &input_rest) == 0) {
+    if (compute_rest_of_type(input_rest, &(td->definition)) != 0) {
+      if (last_space != NULL) *last_space = ' ';
+      return 1;
+    }
+    if (last_space != NULL) *last_space = ' ';
+
+    // Find the already registered primitive if it exists
+    ulint i = 0;
+    while (i < code->primitives.count) {
+      struct primitive_spec * spec = code->primitives.array + i;
+      if (
+          spec->source == data.source &&
+          spec->is_structure == data.is_structure && // That sould be set to 0 though
+          streq(data.buffer, spec->name)
+         ) { // Then they are the same
+        td->definition.ptr = spec;
+        td->definition.type = PrimitiveType;
+        return 0;
+      }
+      i++;
+    }
+    return 1;
+  }
+  if (last_space != NULL) *last_space = ' ';
+
+
   if (td->is_function) { // Don't search, just parse it somehow
     struct status_s status = {
       .reading_function_params = 0,
@@ -713,6 +754,49 @@ static int prepare_variables(struct variables_indic * variables, source_code_t c
   args->results.links += variables->count;
   return 0;
 }
+static int prepare_typedefs(struct typedef_indic * tds, source_code_t code, callback_args args) {
+  struct register_primitive_data data;
+  init_primitive_data(&data);
+
+  char * input_rest = NULL;
+  void * res;
+  ulint i = 0;
+  while (i < tds->count) {
+    struct typedef_spec * td = tds->array + i;
+    char * input = td->buffer;
+    GOTO_NEXTWORD(input);
+    char * last_space = NULL;
+    char * ptr = input;
+    while (*ptr != 0) {
+      if (*ptr == ' ') last_space = ptr;
+      ptr++;
+    }
+    if (last_space != NULL) *last_space = 0;
+
+    if (try_parse_primitive(input, &data, &input_rest) == 0) {
+      // Find the already registered primitive if it exists
+      ulint j = 0;
+      while (j < code->primitives.count) {
+        struct primitive_spec * spec = code->primitives.array + j;
+        if (
+            spec->source == data.source &&
+            spec->is_structure == data.is_structure && // That sould be set to 0 though
+            streq(data.buffer, spec->name)
+        ) { // Then they are the same
+          if (last_space != NULL) *last_space = ' ';
+          return 0;
+        }
+        j++;
+      }
+
+      if (register_primitive(code, &data) != 0) return 1;
+      // The added primitive is automatically the last
+    }
+    if (last_space != NULL) *last_space = ' ';
+    i++;
+  }
+  return 0;
+}
 
 static int prepare_linkage(source_code_t code, callback_args args) {
   prepare_functions(&(code->definitions.functions), code, args);
@@ -720,6 +804,8 @@ static int prepare_linkage(source_code_t code, callback_args args) {
   prepare_structs(&(code->definitions.structs), code, args);
   prepare_structs(&(code->implementations.structs), code, args);
   prepare_variables(&(code->definitions.variables), code, args);
+  prepare_typedefs(&(code->definitions.typedefs), code, args);
+  prepare_typedefs(&(code->implementations.typedefs), code, args);
   return 0;
 }
 int linkage(source_code_t code, callback_args args) {
