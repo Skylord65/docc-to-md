@@ -171,7 +171,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
 
   ulint j = 0;
   while (j < functions->count) {
-    MDDUMP("- [`%s`](#function-%s)\n", functions->array[j].name, functions->array[j].name);
+    MDDUMP("- [%s](#function-%s)\n", functions->array[j].name, functions->array[j].name);
     j++;
   }
 
@@ -238,7 +238,7 @@ static void generate_primitives(gen_config_t config, struct result *result, char
   ulint x = 0;
   while (x < primitives->count) {
     write_primitive_ref(primitives->array + x, namebuf);
-    MDDUMP("- [`%s`](#primitive-%s)\n", primitives->array[x].name, namebuf);
+    MDDUMP("- [%s](#primitive-%s)\n", primitives->array[x].name, namebuf);
     x++;
   }
 
@@ -279,7 +279,7 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
   ulint i = 0;
   while (i < structures->count) {
     struct struct_spec * strc = structures->array + i;
-    MDDUMP("- [`%s`](#structure-%s)\n", strc->name, strc->name);
+    MDDUMP("- [%s](#structure-%s)\n", strc->name, strc->name);
 
     i++;
   }
