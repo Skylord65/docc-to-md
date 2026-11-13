@@ -1,5 +1,4 @@
 #include "rendering.h"
-#include "../debug.h"
 #include "../macros.h"
 #include "../core/core.h"
 #include <fcntl.h>
@@ -388,7 +387,7 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic * tds, int is_
   OPEN(fd, pathbuf, result);
 
   ulint i = 0;
-  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files\n\nDefined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", tds->count);
+  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files\n\n## Defined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", tds->count);
 
   while (i < tds->count) {
     struct typedef_spec * td = tds->array + i;
