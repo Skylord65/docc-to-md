@@ -414,19 +414,70 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic * tds, int is_
   close(fd);
 }
 
+static void write_macro_ref(struct macro_spec * macro, char * buf) {
+  unsigned int index = 0;
+  while (macro->name[index] != 0 && index < ENTITIES_NAME_LENGTH) {
+    if (65 <= macro->name[index] && macro->name[index] <= 90) buf[index] = macro->name[index] + 32;
+    else buf[index] = macro->name[index];
+    index++;
+  }
+  buf[index++] = 0;
+}
+static void generate_macros_page(MDARGS_T, struct macro_indic * macros, int is_header) {
+  PREPARE;
+  PATHNAME(pathbuf, config, "%s-macros.md", is_header ? "headers" : "source");
+  OPEN(fd, pathbuf, result);
+
+  MDDUMP("# %s macros\n\nThis file contains the macros that are written in the %s files\n\n## Defined in this file\n\nThe following **%zu** macros are referenced in this file\n", is_header ? "Headers" : "Source", is_header ? "headers" : "source", macros->count);
+
+  char linkpath[PATH_MAX];
+  char displaypath[PATH_MAX];
+  ulint i = 0;
+  while (i < macros->count) {
+    struct macro_spec * macro = macros->array + i;
+    write_macro_ref(macro, linkpath);
+    MDDUMP("- [%s](#macro-%s)\n", macro->name, linkpath);
+    i++;
+  }
+  i = 0;
+  while (i < macros->count) {
+    struct macro_spec * macro = macros->array + i;
+    MDDUMP("### macro %s\n```c\n#define %s", macro->name, macro->name);
+
+    if (macro->is_function) {
+      MDDUMP("(");
+      ulint x = 0;
+      while (x < macro->args->count) {
+        MDDUMP("%s%s", macro->args->array[x], x + 1 < macro->args->count ? ", " : "");
+        x++;
+      }
+      MDDUMP(")")
+    }
+    MDDUMP(" %s", macro->placeholder);
+
+    generate_path_pair(macro->ref->filename, config, displaypath, linkpath);
+    if (config->gitline) MDDUMP("\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaypath, macro->ref->line, linkpath, macro->ref->line)
+    else MDDUMP("\n```\nDefined in [%s:%zu](%s)\n", displaypath, macro->ref->line, linkpath);
+    i++;
+  }
+
+  close(fd);
+}
 static void generate_homepage(MDARGS_T) {
   PREPARE;
   PATHNAME(pathbuf, config, "Home.md");
   OPEN(fd, pathbuf, result);
 
   MDDUMP("# Homepage\n\n## Summary\n\nThis documentation is split between the informations found in header files and source files.\n| Headers | Implementation |\n|:---:|:---:|\n");
-  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n| [`typedefs (%zu)`](headers-typedefs.md) | [`typedefs (%zu)`](source-typedefs) |\n> See also the [`%zu primitives`](primitives.md)",
+  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n| [`typedefs (%zu)`](headers-typedefs.md) | [`typedefs (%zu)`](source-typedefs) |\n| [`Macros (%zu)`](headers-macros.md) | [`Macros (%zu)`](source-macros.md) |\n> See also the [`%zu primitives`](primitives.md)",
       code->definitions.functions.count,
       code->implementations.functions.count,
       code->definitions.structs.count,
       code->implementations.structs.count,
       code->definitions.typedefs.count,
       code->implementations.typedefs.count,
+      code->definitions.macros.count,
+      code->implementations.macros.count,
       code->primitives.count
   );
 
@@ -447,6 +498,8 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
   generate_typedefs_page(MDARGS_V, &(code->definitions.typedefs), 1);
   generate_typedefs_page(MDARGS_V, &(code->implementations.typedefs), 0);
+  generate_macros_page(MDARGS_V, &(code->definitions.macros), 1);
+  generate_macros_page(MDARGS_V, &(code->implementations.macros), 0);
   generate_primitives(config, result, buffer, &(code->primitives));
   return result->fails > before;
 }
