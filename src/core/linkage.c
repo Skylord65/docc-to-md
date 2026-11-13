@@ -311,6 +311,7 @@ static int try_parse_primitive(char * input, struct register_primitive_data * da
       *restptr = input - 1;
       break;
     }
+    if (*input == 0) break;
     input++;
   }
   if (*input == 0) *restptr = input;
@@ -518,8 +519,8 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
     if (*ptrcp == ' ') last_space = ptrcp;
     ptrcp++;
   }
-  if (last_space != NULL) last_space = 0;
-  if (try_parse_primitive(bufptr, &data, &input_rest) == 0) {
+  if (last_space != NULL) *last_space = 0;
+  if (!td->is_function && try_parse_primitive(bufptr, &data, &input_rest) == 0) {
     if (compute_rest_of_type(input_rest, &(td->definition)) != 0) {
       if (last_space != NULL) *last_space = ' ';
       return 1;
@@ -773,7 +774,7 @@ static int prepare_typedefs(struct typedef_indic * tds, source_code_t code, call
     }
     if (last_space != NULL) *last_space = 0;
 
-    if (try_parse_primitive(input, &data, &input_rest) == 0) {
+    if (!td->is_function && try_parse_primitive(input, &data, &input_rest) == 0) {
       // Find the already registered primitive if it exists
       ulint j = 0;
       while (j < code->primitives.count) {
