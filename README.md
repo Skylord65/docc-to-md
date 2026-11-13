@@ -51,6 +51,8 @@ This is essentially a list of things to do, so I don't forget
 | Unamed functions arguments resolving | Low | Finish the resolving of unamed function arguments. This is mainly for arguments that are custom structs/enums/typedefs or standard types that don't fit in one word | 🚧 |
 | Types resolving | Necessary | Needs the typedef parsing to be done | 🏗️ |
 | Markdown writing | Necessary | Needs types resolved | 🚧 |
+| Pre Linkage | Optional | Add a prelinkage phase to do things like sorting types | 🚧 |
+| Type modifiers | Important | Introduce type modifiers (like constant, volatile...) | 🚧 |
 | Windows Portability | Low | `N/A` | 🏗️ |
 
 > Legend :
