@@ -173,6 +173,22 @@ static void dump_function_type(int fd, char * buffer, struct function_spec * fnt
     x++;
   }
 }
+static void dump_function_signature(int fd, char * buffer, struct function_spec * fnt, source_code_t code, char * locationbuffer) {
+  MDDUMP("#### Return type\n\n[`");
+  dump_argument_type(fd, buffer, &(fnt->returntype));
+  // Recycling displaypath
+  get_type_location(fnt->returntype, code, locationbuffer);
+  MDDUMP("`](%s)\n#### Arguments\n\n%s", locationbuffer, fnt->args->count == 0 ? "*No arguments*" : "");
+
+    ulint x = 0;
+    while (x < fnt->args->count) {
+      MDDUMP("%zu. **%s** : [`", x + 1, fnt->args->array[x].name);
+      dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
+      get_type_location(fnt->args->array[x].type, code, locationbuffer);
+      MDDUMP("`](%s)\n", locationbuffer);
+      x++;
+    }
+}
 static void generate_functions_page(struct function_indic * functions, source_code_t code, gen_config_t config, struct result * result, char * buffer, int is_header) {
   PREPARE;
   PATHNAME(pathbuf, config, "%s-functions.md", is_header ? "headers" : "source");
@@ -201,20 +217,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
 
     if (fnt->description != NULL) MDDUMP("#### Note\n\n```\n%s```\n", fnt->description);
 
-    MDDUMP("#### Return type\n\n[`");
-    dump_argument_type(fd, buffer, &(fnt->returntype));
-    // Recycling displaypath
-    get_type_location(fnt->returntype, code, displaypath);
-    MDDUMP("`](%s)\n#### Arguments\n\n%s", displaypath, fnt->args->count == 0 ? "*No arguments*" : "");
-
-    ulint x = 0;
-    while (x < fnt->args->count) {
-      MDDUMP("%zu. **%s** : [`", x + 1, fnt->args->array[x].name);
-      dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
-      get_type_location(fnt->args->array[x].type, code, displaypath);
-      MDDUMP("`](%s)\n", displaypath);
-      x++;
-    }
+    dump_function_signature(fd, buffer, fnt, code, displaypath);
     j++;
   }
 
@@ -353,8 +356,10 @@ static void dump_enumerator_signature(int fd, char * buffer, struct enum_spec * 
 
   MDDUMP("}");
 }
-static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buffer) {
+static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buffer, char * usingbuffer, source_code_t code) {
+  *usingbuffer = 0;
   if (td->definition.ptr == NULL) return;
+  char referencebuffer[ENTITIES_NAME_LENGTH * 2];
 
   switch (td->definition.type) {
     case NoneType:
@@ -363,7 +368,10 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
       break;
     case PrimitiveType:
       dump_argument_type(fd, buffer, &(td->definition));
-      MDDUMP(" %s;", td->name);
+      MDDUMP(" %s", td->name);
+
+      get_type_location(td->definition, code, referencebuffer);
+      sprintf(usingbuffer, "\n- [`%s`](%s)\n", ((struct primitive_spec *)td->definition.ptr)->name, referencebuffer);
       break;
     case TypedefinedFunction:
     case FunctionType:
@@ -381,10 +389,13 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
     case EnumeratorType:
       dump_argument_type(fd, buffer, &(td->definition));
       MDDUMP(" %s", td->name);
+
+      get_type_location(td->definition, code, referencebuffer);
+      sprintf(usingbuffer, "\n- [`%s`](%s)\n", td->definition.type == EnumeratorType ? ((struct enum_spec *)td->definition.ptr)->name : ((struct struct_spec *)td->definition.ptr)->name, referencebuffer);
       break;
   }
 }
-static void generate_typedefs_page(gen_config_t config, struct result *result, char *buffer, struct typedef_indic *tds, int is_header) {
+static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_header) {
   PREPARE;
   PATHNAME(pathbuf, config, "%s-typedefs.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
@@ -405,11 +416,15 @@ static void generate_typedefs_page(gen_config_t config, struct result *result, c
     struct typedef_spec * td = tds->array + i;
     MDDUMP("### typedef %s\n```c\ntypedef ", td->name);
 
-    dump_typedef_definition(td, fd, buffer);
+    dump_typedef_definition(td, fd, buffer, pathbuf, code); // Yes we recycle buffers here
 
     generate_path_pair(td->ref->filename, config, displaypath, linkpath);
-    if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaypath, td->ref->line, linkpath, td->ref->line)
-    else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n", displaypath, td->ref->line, linkpath);
+    if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n%s", displaypath, td->ref->line, linkpath, td->ref->line, pathbuf)
+    else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n%s", displaypath, td->ref->line, linkpath, pathbuf);
+
+    if (td->definition.type == TypedefinedFunction || td->definition.type == FunctionType) {
+      dump_function_signature(fd, buffer, td->definition.ptr, code, displaypath);
+    }
     i++;
   }
 
@@ -498,8 +513,8 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_functions_page(&(code->implementations.functions), code, config, result, buffer, 0);
   generate_structures_page(MDARGS_V, &(code->definitions.structs), 1);
   generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
-  generate_typedefs_page(config, result, buffer, &(code->definitions.typedefs), 1);
-  generate_typedefs_page(config, result, buffer, &(code->implementations.typedefs), 0);
+  generate_typedefs_page(MDARGS_V, &(code->definitions.typedefs), 1);
+  generate_typedefs_page(MDARGS_V, &(code->implementations.typedefs), 0);
   generate_macros_page(config, result, buffer, &(code->definitions.macros), 1);
   generate_macros_page(config, result, buffer, &(code->implementations.macros), 0);
   generate_primitives(config, result, buffer, &(code->primitives));
