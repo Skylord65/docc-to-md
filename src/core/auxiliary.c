@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../parsers/stringlib.h"
 #include "../parsers/parsers.h"
 #include "../macros.h"
@@ -1773,7 +1774,17 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
   if (GET_TCOUNT(status->is_header, args->source_code) == 1) free(td);\
 }
 
-static char * obtain_last_word_from_end(char * end, char * end_char, char ** endpos, char * word_char, char ** wordpos) {
+static char * obtain_last_word_from_end(char * end, char * end_char, char ** endpos, char * word_char, char ** wordpos, char * namechar, char ** namepos) {
+  while (*end == ' ') end--;
+  while (*end == ']') {
+    while (*end != '[') end--;
+    end--;
+    while (*end == ' ') end--;
+  }
+  *namechar = *(end + 1);
+  *namepos = end + 1;
+  *(end + 1) = 0;
+
   while (*end != ' ') end--;
   char * word = end + 1;
 
@@ -1909,12 +1920,15 @@ static int register_typedef(const char * path, callback_args args, struct status
     td->is_function = 0;
     char end_char;
     char word_char;
+    char name_char;
     char * word_pos;
     char * end_pos;
-    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index, &end_char, &end_pos, &word_char, &word_pos); // In that case this is fine
+    char * name_pos;
+    char * name = obtain_last_word_from_end(data->buffer + strlen(data->buffer) - 1, &end_char, &end_pos, &word_char, &word_pos, &name_char, &name_pos); // In that case this is fine
     STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
 
     *word_pos = word_char;
+    *name_pos = name_char;
     *end_pos = end_char;
   }
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type

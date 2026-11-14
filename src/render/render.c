@@ -1,4 +1,5 @@
 #include "rendering.h"
+#include "../debug.h"
 #include "../macros.h"
 #include "../core/core.h"
 #include <fcntl.h>
@@ -115,7 +116,26 @@ static void get_type_location(entity_type_t type, source_code_t code, char * wri
   }
   write_normalized_name(name, ENTITIES_NAME_LENGTH, writebuffer + index);
 }
-static void dump_argument_type(int fd, char * buffer, entity_type_t * type) {
+static void dump_complementary_types(int fd, char * buffer, entity_type_t * type, char * name) {
+  ulint l = 0;
+  if (type->pointers_level > 0) MDDUMP(" ");
+  while (l < type->pointers_level) {
+    MDDUMP("*");
+    l++;
+  }
+
+  if (name != NULL) MDDUMP(" %s", name);
+
+  if (name == NULL && type->arrays.count > 0) MDDUMP(" ");
+  l = 0;
+  while (l < type->arrays.count) {
+    MDDUMP("[");
+    if (type->arrays.array[l] != NULL) MDDUMP("%s", type->arrays.array[l]);
+    MDDUMP("]");
+    l++;
+  }
+}
+static void dump_argument_type(int fd, char * buffer, entity_type_t * type, char * name) {
   struct primitive_spec * p;
   switch (type->type) {
     case NoneType:
@@ -146,20 +166,7 @@ static void dump_argument_type(int fd, char * buffer, entity_type_t * type) {
       break;
   }
 
-  ulint l = 0;
-  if (type->pointers_level > 0) MDDUMP(" ");
-  while (l < type->pointers_level) {
-    MDDUMP("*");
-    l++;
-  }
-
-  l = 0;
-  while (l < type->arrays.count) {
-    MDDUMP(" [");
-    if (type->arrays.array[l] != NULL) MDDUMP("%s", type->arrays.array[l]);
-    MDDUMP("]");
-    l++;
-  }
+  dump_complementary_types(fd, buffer, type, name);
 }
 static void generate_path_pair(const char * filename, gen_config_t config, char * displaybuffer, char * linkbuffer) {
   if (config->rebase_prefix == NULL) {
@@ -171,18 +178,18 @@ static void generate_path_pair(const char * filename, gen_config_t config, char 
   }
 }
 static void dump_function_type(int fd, char * buffer, struct function_spec * fnt) {
-  dump_argument_type(fd, buffer, &(fnt->returntype));
+  dump_argument_type(fd, buffer, &(fnt->returntype), NULL);
   MDDUMP(" %s(", fnt->name);
   ulint x = 0;
   while (x < fnt->args->count) {
-    dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
-    MDDUMP(" %s%s", fnt->args->array[x].name, x + 1 < fnt->args->count ? ", " : ")");
+    dump_argument_type(fd, buffer, &(fnt->args->array[x].type), fnt->args->array[x].name);
+    MDDUMP("%s", x + 1 < fnt->args->count ? ", " : ")");
     x++;
   }
 }
 static void dump_function_signature(int fd, char * buffer, struct function_spec * fnt, source_code_t code, char * locationbuffer) {
   MDDUMP("#### Return type\n\n[`");
-  dump_argument_type(fd, buffer, &(fnt->returntype));
+  dump_argument_type(fd, buffer, &(fnt->returntype), NULL);
   // Recycling displaypath
   get_type_location(fnt->returntype, code, locationbuffer);
   MDDUMP("`](%s)\n#### Arguments\n\n%s", locationbuffer, fnt->args->count == 0 ? "*No arguments*" : "");
@@ -190,7 +197,7 @@ static void dump_function_signature(int fd, char * buffer, struct function_spec 
     ulint x = 0;
     while (x < fnt->args->count) {
       MDDUMP("%zu. **%s** : [`", x + 1, fnt->args->array[x].name);
-      dump_argument_type(fd, buffer, &(fnt->args->array[x].type));
+      dump_argument_type(fd, buffer, &(fnt->args->array[x].type), NULL);
       get_type_location(fnt->args->array[x].type, code, locationbuffer);
       MDDUMP("`](%s)\n", locationbuffer);
       x++;
@@ -284,8 +291,8 @@ static void dump_structure_signature(int fd, char * buffer, struct struct_spec *
   while (x < strc->members->count) {
     struct struct_member * member = strc->members->array + x;
     MDDUMP("    ");
-    dump_argument_type(fd, buffer, &(member->type));
-    MDDUMP(" %s;\n", member->name);
+    dump_argument_type(fd, buffer, &(member->type), member->name);
+    MDDUMP(";\n");
     x++;
   }
   MDDUMP("}");
@@ -298,7 +305,7 @@ static void dump_structure_members_signature(int fd, char * buffer, struct struc
       struct struct_member * member = strc->members->array + j;
       get_type_location(member->type, code, locationbuffer);
       MDDUMP("- **%s** : [`", member->name);
-      dump_argument_type(fd, buffer, &(member->type));
+      dump_argument_type(fd, buffer, &(member->type), NULL);
       MDDUMP("`](%s)\n", locationbuffer);
 
       j++;
@@ -373,8 +380,7 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
     case TypedefType: // If someone does typedef typedef I kill them
       break;
     case PrimitiveType:
-      dump_argument_type(fd, buffer, &(td->definition));
-      MDDUMP(" %s", td->name);
+      dump_argument_type(fd, buffer, &(td->definition), td->name);
 
       get_type_location(td->definition, code, referencebuffer);
       sprintf(usingbuffer, "\n- [`%s`](%s)\n", ((struct primitive_spec *)td->definition.ptr)->name, referencebuffer);
@@ -385,16 +391,15 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
       break;
     case TypedefinedEnum:
       dump_enumerator_signature(fd, buffer, (struct enum_spec *)td->definition.ptr, 0);
-      MDDUMP(" %s", td->name);
+      dump_complementary_types(fd, buffer, &(td->definition), td->name);
       break;
     case TypedefinedStructure:
       dump_structure_signature(fd, buffer, (struct struct_spec *)td->definition.ptr, 0);
-      MDDUMP(" %s", td->name);
+      dump_complementary_types(fd, buffer, &(td->definition), td->name);
       break;
     case StructureType:
     case EnumeratorType:
-      dump_argument_type(fd, buffer, &(td->definition));
-      MDDUMP(" %s", td->name);
+      dump_argument_type(fd, buffer, &(td->definition), NULL);
 
       get_type_location(td->definition, code, referencebuffer);
       sprintf(usingbuffer, "\n- [`%s`](%s)\n", td->definition.type == EnumeratorType ? ((struct enum_spec *)td->definition.ptr)->name : ((struct struct_spec *)td->definition.ptr)->name, referencebuffer);

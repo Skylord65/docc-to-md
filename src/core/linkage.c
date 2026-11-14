@@ -1,4 +1,5 @@
 #include "core.h"
+#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -292,6 +293,7 @@ static int try_parse_primitive(char * input, struct register_primitive_data * da
     { "Stringpgrep_table_element", LibStringpGrep }, { "Stringpgrep_profile", LibStringpGrep },
     { "Stringpgrep_profiles", LibStringpGrep }, { "DIR", Dirent },
   };
+  char * cp = input;
   unsigned int size = sizeof(fatass_list) / sizeof(struct keyword_element);
   while (*input != 0) {
     if (*input == ' ') input++;
@@ -312,7 +314,7 @@ static int try_parse_primitive(char * input, struct register_primitive_data * da
       break;
     }
     if (*input == 0) break;
-    input++;
+    if (cp == input || *(input - 1) != ' ') input++;
   }
   if (*input == 0) *restptr = input;
 
@@ -521,21 +523,23 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
   }
   if (last_space != NULL) *last_space = 0;
   if (!td->is_function && try_parse_primitive(bufptr, &data, &input_rest) == 0) {
+    if (last_space != NULL) *last_space = ' ';
     if (compute_rest_of_type(input_rest, &(td->definition)) != 0) {
-      if (last_space != NULL) *last_space = ' ';
+      DEBUG("Failed to compute rest of type for " DBG_REDT("%s"), input_rest);
       return 1;
     }
-    if (last_space != NULL) *last_space = ' ';
 
     // Find the already registered primitive if it exists
     ulint i = 0;
     while (i < code->primitives.count) {
       struct primitive_spec * spec = code->primitives.array + i;
+      DEBUG("Looking for " DBG_REDT("%s") " (td : " DBG_LIGHT_REDT("%s") " ) -- against " DBG_YELLOWT("%s"), spec->name, td->name, data.buffer);
       if (
           spec->source == data.source &&
           spec->is_structure == data.is_structure && // That sould be set to 0 though
           streq(data.buffer, spec->name)
          ) { // Then they are the same
+        DEBUG("Matching " DBG_PURPLET("%s") " with " DBG_REDT("%s"), spec->name, data.buffer);
         td->definition.ptr = spec;
         td->definition.type = PrimitiveType;
         return 0;
@@ -588,6 +592,13 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
         return 1;
       }
 
+      char * last_bracket = NULL;
+      char * cp = ptr;
+      while (*cp != 0) {
+        if (*cp == '}') last_bracket = cp;
+        cp++;
+      }
+
       ((struct enum_multiline_status_s *)(status.data))->doubleptr = (struct enum_spec **)(&td->definition.ptr);
       size_t before = args->results.fails;
       register_enum("", args, &status);
@@ -599,6 +610,10 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
 
       args->results.links++;
       td->definition.type = TypedefinedEnum;
+
+      *last_bracket = 0;
+      compute_rest_of_type(last_bracket + 1, &(td->definition));
+      *last_bracket = '}';
       return 0;
     }
   }
@@ -635,6 +650,13 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       }
       STRCP(td->name, ((struct struct_spec *)status.data)->name, ENTITIES_NAME_LENGTH, 1);
 
+      char * last_bracket = NULL;
+      char * cp = ptr;
+      while (*cp != 0) {
+        if (*cp == '}') last_bracket = cp;
+        cp++;
+      }
+
       ((struct struct_multiline_status_s *)(status.data))->doubleptr = (struct struct_spec **)(&td->definition.ptr);
       size_t before = args->results.fails;
       register_structure("", args, &status);
@@ -646,6 +668,11 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       }
       args->results.links++;
       td->definition.type = TypedefinedStructure;
+
+      *last_bracket = 0;
+      compute_rest_of_type(last_bracket + 1, &(td->definition));
+      *last_bracket = '}';
+
       free(copy);
       return 0;
     }
