@@ -50,6 +50,18 @@ static TypeLocation type_location(source_code_t code, entity_type_t type) {
 }
 #undef PTR_COMPARISON
 
+static void write_normalized_name(const char * input, size_t max, char * output) {
+  while (max > 0 && *input != 0) {
+    if (*input == ' ') *output = '-';
+    else if (65 <= *input && *input <= 90) *output = (*input) + 32;
+    else *output = *input;
+
+    input++;
+    output++;
+    max--;
+  }
+  if (max > 0) *output = 0;
+}
 static void get_type_location(entity_type_t type, source_code_t code, char * writebuffer) {
   TypeLocation location = type_location(code, type);
   size_t index;
@@ -101,12 +113,7 @@ static void get_type_location(entity_type_t type, source_code_t code, char * wri
     }
     index = sprintf(writebuffer, "%s-%ss.md#%s-", locationstr, designation, designation);
   }
-  size_t i = 0;
-  while (name[i] != 0 && i < ENTITIES_NAME_LENGTH) {
-    writebuffer[index + i] = name[i] == ' ' ? '-' : name[i];
-    i++;
-  }
-  writebuffer[index + i] = 0;
+  write_normalized_name(name, ENTITIES_NAME_LENGTH, writebuffer + index);
 }
 static void dump_argument_type(int fd, char * buffer, entity_type_t * type) {
   struct primitive_spec * p;
@@ -196,9 +203,11 @@ static void generate_functions_page(struct function_indic * functions, source_co
 
   MDDUMP("# %s functions\n\n## Defined in this file\n\nThe following **%zu** functions are referenced here\n\n", is_header ? "Header" : "Source", functions->count);
 
+  char normalizebuffer[ENTITIES_NAME_LENGTH];
   ulint j = 0;
   while (j < functions->count) {
-    MDDUMP("- [%s](#function-%s)\n", functions->array[j].name, functions->array[j].name);
+    write_normalized_name(functions->array[j].name, ENTITIES_NAME_LENGTH, normalizebuffer);
+    MDDUMP("- [%s](#function-%s)\n", functions->array[j].name, normalizebuffer);
     j++;
   }
 
@@ -224,15 +233,6 @@ static void generate_functions_page(struct function_indic * functions, source_co
 
   close(fd);
 }
-static void write_primitive_ref(struct primitive_spec * primitive, char * output) {
-  ulint i = 0;
-  while (i < ENTITIES_NAME_LENGTH && primitive->name[i] != 0) {
-    if (primitive->name[i] != ' ') output[i] = primitive->name[i];
-    else output[i] = '-';
-    i++;
-  }
-  output[i] = 0;
-}
 #define PRIMITIVE_DUMP(p, TEST_MACRO, text) if (TEST_MACRO(p->source)) MDDUMP("- " text "");
 static void generate_primitives(gen_config_t config, struct result *result, char *buffer, struct primitives_indic *primitives) {
   PREPARE;
@@ -244,7 +244,7 @@ static void generate_primitives(gen_config_t config, struct result *result, char
   char namebuf[ENTITIES_NAME_LENGTH + 1] = {0};
   ulint x = 0;
   while (x < primitives->count) {
-    write_primitive_ref(primitives->array + x, namebuf);
+    write_normalized_name(primitives->array[x].name, ENTITIES_NAME_LENGTH, namebuf);
     MDDUMP("- [%s](#primitive-%s)\n", primitives->array[x].name, namebuf);
     x++;
   }
@@ -312,10 +312,12 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
 
   MDDUMP("# %s structures\n\nThis file contains all the declared structures for the %s\n\n## Defined in this file\n\nThe following **%zu** structures are referenced here\n\n", is_header ? "Headers" : "Source", is_header ? "headers files" : "source files", structures->count);
 
+  char normalizebuffer[ENTITIES_NAME_LENGTH + 2];
   ulint i = 0;
   while (i < structures->count) {
     struct struct_spec * strc = structures->array + i;
-    MDDUMP("- [%s](#structure-%s)\n", strc->name, strc->name);
+    write_normalized_name(strc->name, ENTITIES_NAME_LENGTH, normalizebuffer);
+    MDDUMP("- [%s](#structure-%s)\n", strc->name, normalizebuffer);
 
     i++;
   }
@@ -407,9 +409,11 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
   ulint i = 0;
   MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files\n\n## Defined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", tds->count);
 
+  char normalizebuffer[ENTITIES_NAME_LENGTH];
   while (i < tds->count) {
     struct typedef_spec * td = tds->array + i;
-    MDDUMP("- [%s](#typedef-%s)\n", td->name, td->name);
+    write_normalized_name(td->name, ENTITIES_NAME_LENGTH, normalizebuffer);
+    MDDUMP("- [%s](#typedef-%s)\n", td->name, normalizebuffer);
     i++;
   }
 
