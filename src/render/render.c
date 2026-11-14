@@ -1,5 +1,4 @@
 #include "rendering.h"
-#include "../debug.h"
 #include "../macros.h"
 #include "../core/core.h"
 #include <fcntl.h>
@@ -357,7 +356,6 @@ static void dump_enumerator_signature(int fd, char * buffer, struct enum_spec * 
 static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buffer) {
   if (td->definition.ptr == NULL) return;
 
-  DEBUG(DBG_PURPLET("%s") " is of type " DBG_LIGHT_RED "%d", td->name, td->definition.type);
   switch (td->definition.type) {
     case NoneType:
     case MacroType:
@@ -382,7 +380,7 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
     case StructureType:
     case EnumeratorType:
       dump_argument_type(fd, buffer, &(td->definition));
-      MDDUMP(" %s;", td->name);
+      MDDUMP(" %s", td->name);
       break;
   }
 }

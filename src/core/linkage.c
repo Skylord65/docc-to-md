@@ -603,7 +603,8 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
     }
   }
   if (word_eq(ptr, "struct")) {
-    GOTO_NEXTWORD(ptr);
+    char * ptrcp = ptr;
+    GOTO_NEXTWORD(ptrcp);
     if (*ptr == '{') {
       struct status_s status = {
         .reading_multiline_struct = 0,
@@ -620,8 +621,8 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       STRCP("struct ", copy, 7, 0);
       ulint i = 0;
       ulint writeindex = 7;
-      while (ptr[i] != 0) {
-        if (ptr[i] != '\n') copy[writeindex++] = ptr[i];
+      while (ptrcp[i] != 0) {
+        if (ptrcp[i] != '\n') copy[writeindex++] = ptrcp[i];
         else copy[writeindex++] = ' ';
         i++;
       }
@@ -649,7 +650,12 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       return 0;
     }
   }
-  if (assign_type(code, td->buffer, &(td->definition)) == 0) return 0;
+  *last_space = 0;
+  if (assign_type(code, ptr, &(td->definition)) == 0) {
+    if (last_space != NULL) *last_space = ' ';
+    return 0;
+  }
+  if (last_space != NULL) *last_space = ' ';
   td->definition.type = NoneType;
 
   return 0;
