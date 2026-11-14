@@ -649,6 +649,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       return 0;
     }
   }
+  if (assign_type(code, td->buffer, &(td->definition)) == 0) return 0;
   td->definition.type = NoneType;
 
   return 0;
