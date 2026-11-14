@@ -285,10 +285,25 @@ static void dump_structure_signature(int fd, char * buffer, struct struct_spec *
     struct struct_member * member = strc->members->array + x;
     MDDUMP("    ");
     dump_argument_type(fd, buffer, &(member->type));
-    MDDUMP(";\n");
+    MDDUMP(" %s;\n", member->name);
     x++;
   }
   MDDUMP("}");
+}
+static void dump_structure_members_signature(int fd, char * buffer, struct struct_spec * strc, source_code_t code, char * locationbuffer) {
+  if (strc->members->count > 0) {
+    MDDUMP("\n\n#### Members\n");
+    ulint j = 0;
+    while (j < strc->members->count) {
+      struct struct_member * member = strc->members->array + j;
+      get_type_location(member->type, code, locationbuffer);
+      MDDUMP("- **%s** : [`", member->name);
+      dump_argument_type(fd, buffer, &(member->type));
+      MDDUMP("`](%s)\n", locationbuffer);
+
+      j++;
+    }
+  }
 }
 static void generate_structures_page(MDARGS_T, struct struct_indic * structures, int is_header) {
   PREPARE;
@@ -318,19 +333,8 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
     if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaybuffer, strc->ref->line, linkbuffer, strc->ref->line)
     else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n", displaybuffer, strc->ref->line, linkbuffer);
 
-    if (strc->members->count > 0) {
-      MDDUMP("\n\n#### Members\n");
-      ulint j = 0;
-      while (j < strc->members->count) {
-        struct struct_member * member = strc->members->array + j;
-        get_type_location(member->type, code, displaybuffer);
-        MDDUMP("- **%s** : [`", member->name);
-        dump_argument_type(fd, buffer, &(member->type));
-        MDDUMP("`](%s)\n", displaybuffer);
+    dump_structure_members_signature(fd, buffer, strc, code, displaybuffer);
 
-        j++;
-      }
-    }
     i++;
   }
 
@@ -422,9 +426,8 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
     if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n%s", displaypath, td->ref->line, linkpath, td->ref->line, pathbuf)
     else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n%s", displaypath, td->ref->line, linkpath, pathbuf);
 
-    if (td->definition.type == TypedefinedFunction || td->definition.type == FunctionType) {
-      dump_function_signature(fd, buffer, td->definition.ptr, code, displaypath);
-    }
+    if (td->definition.type == TypedefinedFunction || td->definition.type == FunctionType) dump_function_signature(fd, buffer, td->definition.ptr, code, displaypath);
+    else if (td->definition.type == TypedefinedStructure) dump_structure_members_signature(fd, buffer, td->definition.ptr, code, displaypath);
     i++;
   }
 

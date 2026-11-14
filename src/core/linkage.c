@@ -605,7 +605,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
   if (word_eq(ptr, "struct")) {
     char * ptrcp = ptr;
     GOTO_NEXTWORD(ptrcp);
-    if (*ptr == '{') {
+    if (*ptrcp == '{') {
       struct status_s status = {
         .reading_multiline_struct = 0,
         .data = NULL,
