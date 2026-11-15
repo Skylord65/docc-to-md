@@ -34,9 +34,13 @@ typedef void recursion_callback_t(const char * src, callback_args params);
 extern recursion_return_t recursion(const char * src, callback_args params, recursion_callback_t callback);
 extern void recursion_callback(const char * src, callback_args params);
 extern void remove_comments_callback(const char * src, callback_args params);
-extern void register_doccumments_callback(const char * src, callback_args params);
-
-extern int create_config(const char * src, const char * dst, const char * work, gen_config_t);
+extern void register_docstring_callback(const char * src, callback_args params);
+/*
+ * This function replaces in `path` the source `replace` by the new path `by`.
+ * It writes in buffer as the function goes by
+ */
+extern void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max);
+extern int create_config(const char * src, const char * dst, const char * work, const char * rebase_prefix, gen_config_t);
 extern int mkdirp(const char * path);
 extern int rmdirrf(const char * path);
 extern void cleanup(gen_config_t);
@@ -65,6 +69,9 @@ struct macro_multiline_status_s {
   int in_char;
   ulint starts_on_line;
 };
+/**
+ * `char ** member_array` is an array of strings. Temporarily store them as such and compute the types later in `register_structure` call
+ */
 struct struct_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
   ulint starts_on_line;
@@ -127,6 +134,7 @@ extern int try_extract_typedef(char * buffer, const char * path, callback_args, 
 extern int try_extract_typedef_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 
 extern int linkage(source_code_t code, callback_args args);
+extern int prelinkage(source_code_t code, callback_args args);
 
 // Some registering functions
 void register_function(const char * path, callback_args params, struct status_s * status);

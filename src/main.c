@@ -2,6 +2,7 @@
 #include "reader/reader.h"
 #include "core/core.h"
 #include "parsers/args.h"
+#include "render/rendering.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -49,7 +50,11 @@ int main(int argc, char * argv[]) {
     { "-d", "Dump parsed source code to a file. Needs --dump to specify file name", Presence, 0, 0, NULL },
     { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL },
     { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL },
-    { "--enable-commentdoc", "Enable the registration of doc comments for functions", Presence, 0, 0, NULL }
+    { "--enable-docstring", "Enable the registration of docstring for various types", Presence, 0, 0, NULL },
+    { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL },
+    { "--git-line", "Add the matching line like git would do in file reference", Presence, 0, 0, NULL },
+    { "--reference-files", "Add a section of referenced files in the produced documentation", Presence, 0, 0, NULL },
+    { "--pre-linkage", "Enable the pre-linkage step. Enhance the produced documentation", Presence, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -68,11 +73,14 @@ int main(int argc, char * argv[]) {
   if (!args[1].found) ARG_MISSING(args[1]);
 
   struct gen_config config;
-  if (create_config(args[0].str_result, args[1].str_result, args[2].str_result, &config) != 0) {
+  if (create_config(args[0].str_result, args[1].str_result, args[2].str_result, args[9].str_result, &config) != 0) {
     fprintf(stderr, "Failed to parse config\n");
     return 1;
   }
   config.verbose_registration = args[7].found;
+  config.gitline = args[10].found;
+  config.reference_files_section = args[11].found;
+  config.prelinkage = args[12].found;
 
   struct callback_args_s callback_args = {
     .config = &config,
@@ -91,19 +99,33 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   recursion(config.work, &callback_args, recursion_callback);
-  if (args[8].found) recursion(config.src, &callback_args, register_doccumments_callback);
+  if (args[8].found) recursion(config.src, &callback_args, register_docstring_callback);
   if (callback_args.results.fails > 0) {
-    fprintf(stderr, "Failed to parse content\n");
+    fprintf(stderr, "Failed to parse content (%zu) errors\n", callback_args.results.fails);
     cleanup(&config);
     free_source_code(callback_args.source_code);
     return 1;
   }
   if (args[7].found) summarise_parsing(callback_args.source_code);
+  if (config.prelinkage && prelinkage(callback_args.source_code, &callback_args) != 0) {
+    fprintf(stderr, "Failed the prelinkage phase\n");
+    cleanup(&config);
+    free_source_code(callback_args.source_code);
+    return 1;
+  }
   if (linkage(callback_args.source_code, &callback_args) != 0) {}
   summarise_linking(&callback_args);
 
   dump(callback_args.source_code, args[5], args[6]);
 
+  if (render(callback_args.source_code, &config, &(callback_args.results)) != 0) {
+    fprintf(stderr, "Failed to generate documentation\n");
+    cleanup(&config);
+    free_source_code(callback_args.source_code);
+    return 1;
+  }
+
   cleanup(&config);
   free_source_code(callback_args.source_code);
+  return 0;
 }

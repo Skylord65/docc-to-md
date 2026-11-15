@@ -26,6 +26,7 @@ static void free_macro(struct macro_spec * macro) {
       free(macro->args);
     }
   }
+  if (macro->description != NULL) free(macro->description);
 
   free(macro->ref);
 }
@@ -50,6 +51,7 @@ static void free_structure(struct struct_spec * structure) {
     free(structure->members->array);
   }
   free(structure->members);
+  if (structure->description != NULL) free(structure->description);
   if (structure->ref != NULL) free(structure->ref);
 }
 static void free_structures_array(struct struct_indic * structures) {
@@ -121,6 +123,7 @@ static void free_typedef(struct typedef_spec * td) {
     free_function(td->definition.ptr);
     free(td->definition.ptr);
   }
+  if (td->description != NULL) free(td->description);
   free_type(&(td->definition));
   if (td->buffer != NULL) free(td->buffer);
 }

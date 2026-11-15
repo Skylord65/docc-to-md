@@ -69,11 +69,7 @@ int normalize_type_string(const char * type, char * typebuf, int with_replace_ne
 
   return 0;
 }
-/*
- * This function replaces in `path` the source `replace` by the new path `by`.
- * It writes in buffer as the function goes by
- */
-static void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max) {
+void rebase_path(const char * path, const char * replace, const char * by, char * buffer, size_t max) {
   unsigned i = 0;
   unsigned bufindex = 0;
   while (path[i] == replace[i] && i < max) i++;
@@ -331,6 +327,7 @@ static int register_macro(const char * path, callback_args params, struct status
   STRCP(data->name, macro->name, ENTITIES_NAME_LENGTH, 1);
   STRCP(data->content, macro->placeholder, data->content_index, 1);
   macro->ref->line = data->starts_on_line;
+  macro->description = NULL;
   rebase_path(path, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
 
   if (params->config->verbose_registration) printf("- Registering macro %s (%zu arguments)\n", macro->name, macro->is_function ? macro->args->count : 0);
@@ -656,6 +653,7 @@ int register_structure(const char * filename, callback_args params, struct statu
 
       if (typebuf == NULL || namebuf == NULL) {
         params->results.fails++;
+        fprintf(stderr, "    /!\\ Failed to compute struct member types and name (input was : %s)\n", srcbuf);
         free(structure->members->array);
         free(structure->members);
         free(structure->ref);
@@ -678,9 +676,10 @@ int register_structure(const char * filename, callback_args params, struct statu
   }
 
   STRCP(data->name, structure->name, ENTITIES_NAME_LENGTH, 1);
-  STRCP((char *)filename, structure->ref->filename, PATH_MAX, 1);
+  rebase_path(filename, params->config->work, params->config->src, structure->ref->filename, PATH_MAX);
   structure->members->count = data->members_count;
   structure->ref->line = data->starts_on_line;
+  structure->description = NULL;
 
   if (data->doubleptr == NULL) {
     if (status->is_header) params->source_code->definitions.structs.count++;
@@ -1007,6 +1006,12 @@ almost_complete_fail:
       }
 
       char * var_name = input;
+      if (starts_with(var_name, "const ")) {
+        function->args->array[i].type.is_constant = 1;
+        while (*var_name != ' ') var_name++;
+        while (*var_name == ' ') var_name++;
+      }
+      char * realinput = var_name;
       unsigned j = 0;
       char * bracket_ptr = NULL;
       int needs_bracket_operation = 0;
@@ -1020,6 +1025,7 @@ almost_complete_fail:
           var_name = input + j + 1;
         }
         if (input[j] == '(' || input[j] == '{') {
+          fprintf(stderr, "    /!\\ Invalid function argument definition (%s at %s:%zu)\n", input, data->filenameptr, data->starts_on_line);
           free(input);
           goto almost_complete_fail;
         }
@@ -1027,7 +1033,7 @@ almost_complete_fail:
       }
       int replaced = 0;
       char * zero = var_name;
-      if (var_name == input || *var_name == '*') { // That's the case when we have only 1 word, so it has to be a type
+      if (var_name == realinput || *var_name == '*') { // That's the case when we have only 1 word, so it has to be a type
                                                    // Or the case when it is a pointer
         char namebuf[ENTITIES_NAME_LENGTH];
         snprintf(namebuf, ENTITIES_NAME_LENGTH, "__arg_no_%zu", i + 1);
@@ -1440,7 +1446,7 @@ void register_enum(const char * path, callback_args args, struct status_s * stat
   enumerator->members->array = data->members; // Since these are already malloced, we can just pass the pointer. Just don't free it afterwards
   enumerator->ref->line = data->starts_on_line;
   STRCP(data->name, enumerator->name, ENTITIES_NAME_LENGTH, 1);
-  STRCP((char *)path, enumerator->ref->filename, PATH_MAX, 1);
+  rebase_path(path, args->config->work, args->config->src, enumerator->ref->filename, PATH_MAX);
 
   if (args->config->verbose_registration) printf("- Registering enumerator %s (%zu members)\n", enumerator->name, enumerator->members->count);
 
@@ -1482,9 +1488,9 @@ static long long int parse_from_hex(char * input, size_t max) {
 
   long long int res = 0;
   while (max > 0 && *input != 0) {
-    if (48 <= *input && *input <= 57) INCREMENT_RES(res, input - 48, 16)
-    else if (97 <= *input && *input <= 102) INCREMENT_RES(res, input - 97, 16)
-    else if (65 <= *input && *input <= 70) INCREMENT_RES(res, input - 65, 16)
+    if (48 <= *input && *input <= 57) INCREMENT_RES(res, *input - 48, 16)
+    else if (97 <= *input && *input <= 102) INCREMENT_RES(res, *input - 97, 16)
+    else if (65 <= *input && *input <= 70) INCREMENT_RES(res, *input - 65, 16)
     max--;
     input++;
   }
@@ -1500,7 +1506,7 @@ static long long int parse_from_octal(char * input, size_t max) {
 
   long long int res = 0;
   while (max > 0 && *input != 0) {
-    if (48 <= *input && *input <= 55) INCREMENT_RES(res, input - 48, 8);
+    if (48 <= *input && *input <= 55) INCREMENT_RES(res, *input - 48, 8);
     max--;
     input++;
   }
@@ -1516,7 +1522,7 @@ static long long int parse_from_binary(char * input, size_t max) {
 
   long long int res = 0;
   while (max > 0 && *input != 0) {
-    if (*input == 48 || *input == 49) INCREMENT_RES(res, input - 48, 2);
+    if (*input == 48 || *input == 49) INCREMENT_RES(res, *input - 48, 2);
     max--;
     input++;
   }
@@ -1525,20 +1531,28 @@ static long long int parse_from_binary(char * input, size_t max) {
 }
 static void increment_number(char * input, char * outputbuf, size_t max) {
   if (*input == '0' && *(input + 1) == 'x') { // We have to work with hexadecimal. Pray for us
-    long long int value = parse_from_hex(input, max);
+    long long int value = parse_from_hex(input + 2, max);
     snprintf(outputbuf, max, "0x%llx", value + 1);
   } else if (*input == '0' && *(input + 1) == 'b') { // We have to work with binary
-    long long int value = parse_from_binary(input, max);
+    long long int value = parse_from_binary(input + 2, max) + 1;
     *outputbuf = '0';
     *(outputbuf + 1) = 'b';
     int index = 2;
-    while (value) {
-      if (value & 1) outputbuf[index++] = '1';
-      else outputbuf[index++] = '0';
-      value >>= 1;
+    if (value == 0) {
+      outputbuf[index++] = '0';
+    } else {
+      int high_bit = 0;
+
+      while ((value >> high_bit) > 1) high_bit++;
+      while (high_bit >= 0) {
+        if ((value >> high_bit) & 1) outputbuf[index++] = '1';
+        else outputbuf[index++] = '0';
+        high_bit--;
+      }
     }
-  } else if (*input == '0') { // We are working with octal
-    long long int value = parse_from_octal(input, max);
+    outputbuf[index++] = 0;
+  } else if (*input == '0' && *(input + 1) != 0) { // We are working with octal
+    long long int value = parse_from_octal(input + 2, max);
     snprintf(outputbuf, max, "0%llo", value);
   } else { // Decimal
     long long int value = parse_llint(input, NULL);
@@ -1777,7 +1791,17 @@ int try_extract_enum_multiline(char *buffer, const char *path, callback_args arg
   if (GET_TCOUNT(status->is_header, args->source_code) == 1) free(td);\
 }
 
-static char * obtain_last_word_from_end(char * end, char * end_char, char ** endpos, char * word_char, char ** wordpos) {
+static char * obtain_last_word_from_end(char * end, char * end_char, char ** endpos, char * word_char, char ** wordpos, char * namechar, char ** namepos) {
+  while (*end == ' ') end--;
+  while (*end == ']') {
+    while (*end != '[') end--;
+    end--;
+    while (*end == ' ') end--;
+  }
+  *namechar = *(end + 1);
+  *namepos = end + 1;
+  *(end + 1) = 0;
+
   while (*end != ' ') end--;
   char * word = end + 1;
 
@@ -1913,18 +1937,22 @@ static int register_typedef(const char * path, callback_args args, struct status
     td->is_function = 0;
     char end_char;
     char word_char;
+    char name_char;
     char * word_pos;
     char * end_pos;
-    char * name = obtain_last_word_from_end(data->buffer + data->buffer_index, &end_char, &end_pos, &word_char, &word_pos); // In that case this is fine
+    char * name_pos;
+    char * name = obtain_last_word_from_end(data->buffer + strlen(data->buffer) - 1, &end_char, &end_pos, &word_char, &word_pos, &name_char, &name_pos); // In that case this is fine
     STRCP(name, td->name, ENTITIES_NAME_LENGTH, 1);
 
     *word_pos = word_char;
+    *name_pos = name_char;
     *end_pos = end_char;
   }
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
   td->ref->line = data->starts_on_line;
   td->modifiers = data->modifiers;
-  STRCP((char *)path, td->ref->filename, PATH_MAX, 1);
+  td->description = NULL;
+  rebase_path(path, args->config->work, args->config->src, td->ref->filename, PATH_MAX);
 
   if (args->config->verbose_registration) printf("- Registering typedef %s\n", td->name);
 

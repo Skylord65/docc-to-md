@@ -58,6 +58,7 @@ typedef struct {
   void * ptr;
   unsigned int pointers_level;
   struct arrays_spec arrays;
+  char is_constant;
 } entity_type_t;
 
 // Members types
@@ -70,6 +71,7 @@ struct struct_members {
   struct struct_member * array;
 };
 struct struct_spec {
+  char * description;
   reference_t ref;
   char name[ENTITIES_NAME_LENGTH];
   struct struct_members * members;
@@ -91,6 +93,7 @@ struct enum_spec {
 struct typedef_spec {
   reference_t ref;
   char * buffer;
+  char * description;
   char name[ENTITIES_NAME_LENGTH];
   entity_type_t definition;
   fnt_modifier modifiers;
@@ -121,9 +124,15 @@ struct macro_spec {
   char name[ENTITIES_NAME_LENGTH];
   char placeholder[MACRO_PLACEHOLDER_LENGTH];
   int is_function;
+  char * description;
   struct macro_args * args;
   reference_t ref;
 };
+/*
+ * Non exhaustive enumerator for primitives
+ *
+ * Binary because typese could be mismatched
+ */
 typedef enum {
   GlibC          = 0b00000000000001,
   Stdio          = 0b00000000000010,
