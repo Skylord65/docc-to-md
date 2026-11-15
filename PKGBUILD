@@ -1,6 +1,6 @@
 pkgname=docc-to-md
 _name=docc-to-md
-pkgver=0.0.1
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="Generate markdown documentation for C source code"
 arch=("x86_64" "aarch64")

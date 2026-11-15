@@ -1,7 +1,7 @@
 #ifndef __MACROS_H__
 #define __MACROS_H__
 
-#define PROG_VERSION "0.0.1"
+#define PROG_VERSION "1.0.0"
 
 #define STRCP(src, dest, max, with_zero) {\
   char * s = src;\
