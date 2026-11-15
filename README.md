@@ -26,7 +26,7 @@ When the binary is compiler (see [installation](#installation) to compile it/dow
 | `--rebase-path` | *String* | If not specified, the **absolute path** of the local files will be shown, as display and link in documentation. If specified : in links, the display will be the individual filenames, relative to the root of the project (specified by `--src`), and the link will be pointing to whatever this argument specifies immediately followed by the relative path of the file to the project root | *Optional* | **N/A** |
 | `--git-line` | *Toggle* | If enabled, add `#line-number-reference` of the elements in the link of their definition file. it is useful for git repositories so it links directly to the definition. Useful in large files | *Optional* | **N/A** |
 | `--reference-files` | *Toggle* | If enabled, add a section at the end of each documentation file, specifying which file are referenced inside the specific documentation file | *Optional* | **N/A** |
-| `--pre-linkage` | **Toggle* | If enabled, includes an additional step between parsing and linkage. It is used to enhance the resulting documentation, by sorting objects by name (using quick sort). On very large projects with a lot of objects, it might not be recommended | **N/A** |
+| `--pre-linkage` | *Toggle* | If enabled, includes an additional step between parsing and linkage. It is used to enhance the resulting documentation, by sorting objects by name (using quick sort). On very large projects with a lot of objects, it might not be recommended | **N/A** |
 
 ### Usage examples
 
@@ -137,15 +137,15 @@ This is essentially a list of things to do, so I don't forget
 | Include docstring for other types | Medium | For now, only the functions take the docstring | ✅ |
 | Unamed functions arguments resolving | Low | Finish the resolving of unamed function arguments. This is mainly for arguments that are custom structs/enums/typedefs or standard types that don't fit in one word | ✅ |
 | Types resolving | Necessary | Needs the typedef parsing to be done | ✅ |
-| Markdown writing | Necessary | Needs types resolved | 🚧 |
-| Pre Linkage | Optional | Add a prelinkage phase to do things like sorting types | 🚧 |
-| Type modifiers | Important | Introduce type modifiers (like constant, volatile...) | 🚧 |
+| Markdown writing | Necessary | Needs types resolved | ✅ |
+| Pre Linkage | Optional | Add a prelinkage phase to do things like sorting types | ✅ |
+| Type modifiers | Important | Introduce type modifiers (like constant, volatile...) | ✅ |
 | Windows Portability | Low | `N/A` | 🏗️ |
 
-> Legend :
-> 🚧 : Planned
-> 🏗️ : Working on it
-> ❌ : Aborted
+> Legend :<br>
+> 🚧 : Planned<br>
+> 🏗️ : Working on it<br>
+> ❌ : Aborted<br>
 > ✅ : Done
 
 ## Contact
