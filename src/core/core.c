@@ -417,7 +417,7 @@ int mkdirp(const char * path) {
   return 0;
 }
 
-void register_doccumments_callback(const char * src, callback_args params) {
+void register_docstring_callback(const char * src, callback_args params) {
   FILE * stream;
   if ((stream = fopen(src, "rb")) == NULL) {
     perror("fopen");

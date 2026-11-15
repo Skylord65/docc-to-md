@@ -34,7 +34,7 @@ typedef void recursion_callback_t(const char * src, callback_args params);
 extern recursion_return_t recursion(const char * src, callback_args params, recursion_callback_t callback);
 extern void recursion_callback(const char * src, callback_args params);
 extern void remove_comments_callback(const char * src, callback_args params);
-extern void register_doccumments_callback(const char * src, callback_args params);
+extern void register_docstring_callback(const char * src, callback_args params);
 /*
  * This function replaces in `path` the source `replace` by the new path `by`.
  * It writes in buffer as the function goes by

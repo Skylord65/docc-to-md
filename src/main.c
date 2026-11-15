@@ -50,7 +50,7 @@ int main(int argc, char * argv[]) {
     { "-d", "Dump parsed source code to a file. Needs --dump to specify file name", Presence, 0, 0, NULL },
     { "--dump", "Specify the file name for the parsed code", String, 0, 0, NULL },
     { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL },
-    { "--enable-commentdoc", "Enable the registration of doc comments for functions", Presence, 0, 0, NULL },
+    { "--enable-docstring", "Enable the registration of docstring for various types", Presence, 0, 0, NULL },
     { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL },
     { "--git-line", "Add the matching line like git would do in file reference", Presence, 0, 0, NULL }
   };
@@ -95,7 +95,7 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   recursion(config.work, &callback_args, recursion_callback);
-  if (args[8].found) recursion(config.src, &callback_args, register_doccumments_callback);
+  if (args[8].found) recursion(config.src, &callback_args, register_docstring_callback);
   if (callback_args.results.fails > 0) {
     fprintf(stderr, "Failed to parse content\n");
     cleanup(&config);
