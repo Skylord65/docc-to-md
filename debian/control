@@ -10,7 +10,6 @@ Build-Depends:
 Standards-Version: 4.7.0
 Homepage: https://git.greensky.tf/Greensky/docc-to-md
 Rules-Requires-Root: no
-License: GPL-3.0-or-later
 
 Package: docc-to-md
 Architecture: any
