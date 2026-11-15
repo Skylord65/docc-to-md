@@ -19,6 +19,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Install deps
+        run: |
+          apt-get install -y jq
+
       - name: Create executable
         id: exe
         run: |
