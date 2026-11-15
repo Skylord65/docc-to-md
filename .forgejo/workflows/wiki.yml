@@ -35,7 +35,7 @@ jobs:
           WIKI_DIR="$( realpath ~/documentation )"
           echo "wiki_dir=$WIKI_DIR" >> "$GITHUB_OUTPUT"
 
-          /usr/bin/docc-to-md --src src --dest "$WIKI_DIR" --verbose-registration --enable-docstring --reference-files --git-line --rebase-path $URL/src/branch/main/
+          /usr/bin/docc-to-md --src src --dest "$WIKI_DIR" --verbose-registration --enable-docstring --reference-files --git-line --pre-linkage --rebase-path $URL/src/branch/main/
 
       - name: Push documentation to wiki
         id: pushwiki

@@ -37,7 +37,7 @@ This repository contains a [wiki creation and synchronisation workflow](./.forge
 
 ```bash
 # Compiling step
-/usr/bin/docc-to-md --src src --dest "$WIKI_DIR" --verbose-registration --enable-docstring --reference-files --git-line --rebase-path $URL/src/branch/main/
+/usr/bin/docc-to-md --src src --dest "$WIKI_DIR" --verbose-registration --enable-docstring --reference-files --git-line --pre-linkage --rebase-path $URL/src/branch/main/
 
 # Later on :
 ## Publishing step
