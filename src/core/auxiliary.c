@@ -1440,7 +1440,7 @@ void register_enum(const char * path, callback_args args, struct status_s * stat
   enumerator->members->array = data->members; // Since these are already malloced, we can just pass the pointer. Just don't free it afterwards
   enumerator->ref->line = data->starts_on_line;
   STRCP(data->name, enumerator->name, ENTITIES_NAME_LENGTH, 1);
-  STRCP((char *)path, enumerator->ref->filename, PATH_MAX, 1);
+  rebase_path(path, args->config->work, args->config->src, enumerator->ref->filename, PATH_MAX);
 
   if (args->config->verbose_registration) printf("- Registering enumerator %s (%zu members)\n", enumerator->name, enumerator->members->count);
 
@@ -1482,9 +1482,9 @@ static long long int parse_from_hex(char * input, size_t max) {
 
   long long int res = 0;
   while (max > 0 && *input != 0) {
-    if (48 <= *input && *input <= 57) INCREMENT_RES(res, input - 48, 16)
-    else if (97 <= *input && *input <= 102) INCREMENT_RES(res, input - 97, 16)
-    else if (65 <= *input && *input <= 70) INCREMENT_RES(res, input - 65, 16)
+    if (48 <= *input && *input <= 57) INCREMENT_RES(res, *input - 48, 16)
+    else if (97 <= *input && *input <= 102) INCREMENT_RES(res, *input - 97, 16)
+    else if (65 <= *input && *input <= 70) INCREMENT_RES(res, *input - 65, 16)
     max--;
     input++;
   }
@@ -1500,7 +1500,7 @@ static long long int parse_from_octal(char * input, size_t max) {
 
   long long int res = 0;
   while (max > 0 && *input != 0) {
-    if (48 <= *input && *input <= 55) INCREMENT_RES(res, input - 48, 8);
+    if (48 <= *input && *input <= 55) INCREMENT_RES(res, *input - 48, 8);
     max--;
     input++;
   }
@@ -1516,7 +1516,7 @@ static long long int parse_from_binary(char * input, size_t max) {
 
   long long int res = 0;
   while (max > 0 && *input != 0) {
-    if (*input == 48 || *input == 49) INCREMENT_RES(res, input - 48, 2);
+    if (*input == 48 || *input == 49) INCREMENT_RES(res, *input - 48, 2);
     max--;
     input++;
   }
@@ -1525,20 +1525,28 @@ static long long int parse_from_binary(char * input, size_t max) {
 }
 static void increment_number(char * input, char * outputbuf, size_t max) {
   if (*input == '0' && *(input + 1) == 'x') { // We have to work with hexadecimal. Pray for us
-    long long int value = parse_from_hex(input, max);
+    long long int value = parse_from_hex(input + 2, max);
     snprintf(outputbuf, max, "0x%llx", value + 1);
   } else if (*input == '0' && *(input + 1) == 'b') { // We have to work with binary
-    long long int value = parse_from_binary(input, max);
+    long long int value = parse_from_binary(input + 2, max) + 1;
     *outputbuf = '0';
     *(outputbuf + 1) = 'b';
     int index = 2;
-    while (value) {
-      if (value & 1) outputbuf[index++] = '1';
-      else outputbuf[index++] = '0';
-      value >>= 1;
+    if (value == 0) {
+      outputbuf[index++] = '0';
+    } else {
+      int high_bit = 0;
+
+      while ((value >> high_bit) > 1) high_bit++;
+      while (high_bit >= 0) {
+        if ((value >> high_bit) & 1) outputbuf[index++] = '1';
+        else outputbuf[index++] = '0';
+        high_bit--;
+      }
     }
-  } else if (*input == '0') { // We are working with octal
-    long long int value = parse_from_octal(input, max);
+    outputbuf[index++] = 0;
+  } else if (*input == '0' && *(input + 1) != 0) { // We are working with octal
+    long long int value = parse_from_octal(input + 2, max);
     snprintf(outputbuf, max, "0%llo", value);
   } else { // Decimal
     long long int value = parse_llint(input, NULL);

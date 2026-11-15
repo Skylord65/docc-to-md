@@ -610,6 +610,8 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
       *last_bracket = 0;
       compute_rest_of_type(last_bracket + 1, &(td->definition));
       *last_bracket = '}';
+
+      rebase_path(td->ref->filename, args->config->work, args->config->src, ((struct enum_spec *)td->definition.ptr)->ref->filename, PATH_MAX);
       return 0;
     }
   }

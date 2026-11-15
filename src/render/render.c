@@ -438,7 +438,7 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
   close(fd);
 }
 static void dump_enumerator_signature(int fd, char * buffer, struct enum_spec * enumerator, const char dump_name) {
-  MDDUMP("enum%s {%s", dump_name == 1 ? enumerator->name : "", enumerator->members->count > 0 ? "\n" : "");
+  MDDUMP("enum%s%s {%s", dump_name == 1 ? " " : "", dump_name == 1 ? enumerator->name : "", enumerator->members->count > 0 ? "\n" : "");
 
   size_t max = 0;
   ulint x = 0;
@@ -493,6 +493,45 @@ static void dump_typedef_definition(struct typedef_spec * td, int fd, char * buf
       sprintf(usingbuffer, "\n- [`%s`](%s)\n", td->definition.type == EnumeratorType ? ((struct enum_spec *)td->definition.ptr)->name : ((struct struct_spec *)td->definition.ptr)->name, referencebuffer);
       break;
   }
+}
+static void generate_enums_page(MDARGS_T, struct enum_indic * enums, int is_header) {
+  PREPARE;
+  PATHNAME(pathbuf, config, "%s-enumerators.md", is_header ? "headers" : "source");
+  OPEN(fd, pathbuf, result);
+
+  ulint i = 0;
+  MDDUMP("# %s enumerators\n\nThis file contains the enumerators that are written in the %s files" GOBACK_TO_HP "%s\n\n## Defined in this file\n\nThe following **%zu** enumerators are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", enums->count);
+
+  char normalizebuffer[ENTITIES_NAME_LENGTH];
+  while (i < enums->count) {
+    struct enum_spec * enumerator = enums->array + i;
+    write_normalized_name(enumerator->name, ENTITIES_NAME_LENGTH, normalizebuffer);
+    MDDUMP("- [%s](#enumerator-%s)\n", enumerator->name, normalizebuffer);
+    i++;
+  }
+
+  char linkpath[PATH_MAX];
+  char displaypath[PATH_MAX];
+  i = 0;
+  while (i < enums->count) {
+    struct enum_spec * enumerator = enums->array + i;
+    MDDUMP("### enumerator %s\n" GOBACK_TO_TOP "\n```c\n", enumerator->name);
+
+    dump_enumerator_signature(fd, buffer, enumerator, 1);
+    //dump_typedef_definition(td, fd, buffer, pathbuf, code); // Yes we recycle buffers here
+
+    generate_path_pair(enumerator->ref->filename, config, displaypath, linkpath);
+    if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n%s", displaypath, enumerator->ref->line, linkpath, enumerator->ref->line, pathbuf)
+    else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n%s", displaypath, enumerator->ref->line, linkpath, pathbuf);
+
+    i++;
+  }
+
+  if (config->reference_files_section) {
+    MDDUMP("\n\n## Indexed files\n");
+    dump_references(fd, buffer, enums, EnumsIndic, config);
+  }
+  close(fd);
 }
 static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_header) {
   PREPARE;
@@ -600,7 +639,7 @@ static void generate_homepage(MDARGS_T) {
   OPEN(fd, pathbuf, result);
 
   MDDUMP("# Homepage\n\n## Summary\n\nThis documentation is split between the informations found in header files and source files.\n| Headers | Implementation |\n|:---:|:---:|\n");
-  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n| [`typedefs (%zu)`](headers-typedefs.md) | [`typedefs (%zu)`](source-typedefs) |\n| [`Macros (%zu)`](headers-macros.md) | [`Macros (%zu)`](source-macros.md) |\n> See also the [`%zu primitives`](primitives.md)",
+  MDDUMP("| [`functions (%zu)`](headers-functions.md) | [`Functions (%zu)`](source-functions.md) |\n| [`structures (%zu)`](headers-structures.md) | [`structures (%zu)`](source-structures.md)\n| [`typedefs (%zu)`](headers-typedefs.md) | [`typedefs (%zu)`](source-typedefs) |\n| [`Macros (%zu)`](headers-macros.md) | [`Macros (%zu)`](source-macros.md) |\n| [`enumerators (%zu)`](headers-enumerators.md) | [`enumerators (%zu)`](source-enumerators.md) |\n> See also the [`%zu primitives`](primitives.md)",
       code->definitions.functions.count,
       code->implementations.functions.count,
       code->definitions.structs.count,
@@ -609,6 +648,8 @@ static void generate_homepage(MDARGS_T) {
       code->implementations.typedefs.count,
       code->definitions.macros.count,
       code->implementations.macros.count,
+      code->definitions.enums.count,
+      code->implementations.enums.count,
       code->primitives.count
   );
 
@@ -629,6 +670,8 @@ int render(source_code_t code, gen_config_t config, struct result * result) {
   generate_structures_page(MDARGS_V, &(code->implementations.structs), 0);
   generate_typedefs_page(MDARGS_V, &(code->definitions.typedefs), 1);
   generate_typedefs_page(MDARGS_V, &(code->implementations.typedefs), 0);
+  generate_enums_page(MDARGS_V, &(code->definitions.enums), 1);
+  generate_enums_page(MDARGS_V,&(code->implementations.enums), 0);
   generate_macros_page(config, result, buffer, &(code->definitions.macros), 1);
   generate_macros_page(config, result, buffer, &(code->implementations.macros), 0);
   generate_primitives(config, result, buffer, &(code->primitives));
