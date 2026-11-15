@@ -97,6 +97,19 @@ cmake CMakeLists.txt
 make -f Makefile
 ```
 
+> **Compile arguments list**
+> You can include these arguments right in the compilation command, for example : `make DBG_POSITION`
+
+| Argument | Type | Effect |
+|:--------:|:----:|:------:|
+| `NODEBUG` | Int | Disable debug macros if set to anything |
+| `DISABLE_DEBUG` | int | Same as `NODEBUG` |
+| `DBG_POSITION` | int | Enables position prefix in debugging macros if set to anything |
+| `DBG_BLOCK` | int | Enables the real time clock in debug macros if set to anything |
+| `DBG_NO_COL` | int | Disables default  color in debug macros if set to anything |
+
+> *`cleanbuild` target comes with `NODEBUG` flag*
+
 ### From PKGBUILD (arch)
 
 If you are using arch, you can install it through the PKGBUILD file :
