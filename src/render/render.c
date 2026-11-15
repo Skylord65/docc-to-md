@@ -223,6 +223,7 @@ static void dump_complementary_types(int fd, char * buffer, entity_type_t * type
   }
 }
 static void dump_argument_type(int fd, char * buffer, entity_type_t * type, char * name) {
+  if (type->is_constant) MDDUMP("const ");
   struct primitive_spec * p;
   switch (type->type) {
     case NoneType:
@@ -278,7 +279,7 @@ static void dump_function_signature(int fd, char * buffer, struct function_spec 
       MDDUMP("%zu. **%s** : [`", x + 1, fnt->args->array[x].name);
       dump_argument_type(fd, buffer, &(fnt->args->array[x].type), NULL);
       get_type_location(fnt->args->array[x].type, code, locationbuffer);
-      MDDUMP("`](%s)\n", locationbuffer);
+      MDDUMP("`](%s)%s\n", locationbuffer, fnt->args->array[x].type.is_constant ? " *- constant*" : "");
       x++;
     }
 }

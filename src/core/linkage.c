@@ -345,6 +345,8 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
   init_primitive_data(&data);
 
+  if (type != NULL) type->is_constant = starts_with(input, "const ");
+
   char * input_rest = NULL;
   void * res;
   if ((res = identify_macro(input, code)) != NULL) {

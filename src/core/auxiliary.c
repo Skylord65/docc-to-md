@@ -1006,6 +1006,12 @@ almost_complete_fail:
       }
 
       char * var_name = input;
+      if (starts_with(var_name, "const ")) {
+        function->args->array[i].type.is_constant = 1;
+        while (*var_name != ' ') var_name++;
+        while (*var_name == ' ') var_name++;
+      }
+      char * realinput = var_name;
       unsigned j = 0;
       char * bracket_ptr = NULL;
       int needs_bracket_operation = 0;
@@ -1027,7 +1033,7 @@ almost_complete_fail:
       }
       int replaced = 0;
       char * zero = var_name;
-      if (var_name == input || *var_name == '*') { // That's the case when we have only 1 word, so it has to be a type
+      if (var_name == realinput || *var_name == '*') { // That's the case when we have only 1 word, so it has to be a type
                                                    // Or the case when it is a pointer
         char namebuf[ENTITIES_NAME_LENGTH];
         snprintf(namebuf, ENTITIES_NAME_LENGTH, "__arg_no_%zu", i + 1);

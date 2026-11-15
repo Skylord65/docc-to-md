@@ -58,6 +58,7 @@ typedef struct {
   void * ptr;
   unsigned int pointers_level;
   struct arrays_spec arrays;
+  char is_constant;
 } entity_type_t;
 
 // Members types
