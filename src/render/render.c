@@ -30,6 +30,15 @@
   snprintf(into + written, PATH_MAX - written - 1, "/" __VA_ARGS__);\
 }
 
+/*
+ * Variable to go back to top of the page
+ * Purely a string, include it wherever it is needed
+ *
+ * It is based on the ## Defined in this file anchor
+ */
+#define GOBACK_TO_TOP "\n> [*Go back to top*](#defined-in-this-file)"
+#define GOBACK_TO_HP "\n> [Go back to homepage](./Home.md)<br>"
+
 string_hash hash_string(char * input, size_t max) {
   size_t index = 0;
   string_hash hash = 0;
@@ -277,7 +286,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
   PATHNAME(pathbuf, config, "%s-functions.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
 
-  MDDUMP("# %s functions\nThis file contains the definitions and documentation of the functions%s\n\n## Defined in this file\n\nThe following **%zu** functions are referenced here\n\n", is_header ? "Header" : "Source", config->reference_files_section ? "\n> [Skip to files index](#indexed-files)" : "", functions->count);
+  MDDUMP("# %s functions\nThis file contains the definitions and documentation of the functions" GOBACK_TO_HP "%s\n\n## Defined in this file\n\nThe following **%zu** functions are referenced here\n\n", is_header ? "Header" : "Source", config->reference_files_section ? "\n> [Skip to files index](#indexed-files)" : "", functions->count);
 
   char normalizebuffer[ENTITIES_NAME_LENGTH];
   ulint j = 0;
@@ -290,7 +299,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
   j = 0;
   while (j < functions->count) {
     struct function_spec * fnt = functions->array + j;
-    MDDUMP("\n### function %s\n\n```c\n", fnt->name);
+    MDDUMP("\n### function %s\n" GOBACK_TO_TOP "\n```c\n", fnt->name);
 
     dump_function_type(fd, buffer, fnt);
 
@@ -390,7 +399,7 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
   PATHNAME(pathbuf, config, "%s-structures.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
 
-  MDDUMP("# %s structures\n\nThis file contains all the declared structures for the %s%s\n\n## Defined in this file\n\nThe following **%zu** structures are referenced here\n\n", is_header ? "Headers" : "Source", is_header ? "headers files" : "source files", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", structures->count);
+  MDDUMP("# %s structures\n\nThis file contains all the declared structures for the %s" GOBACK_TO_HP "%s\n\n## Defined in this file\n\nThe following **%zu** structures are referenced here\n\n", is_header ? "Headers" : "Source", is_header ? "headers files" : "source files", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", structures->count);
 
   char normalizebuffer[ENTITIES_NAME_LENGTH + 2];
   ulint i = 0;
@@ -407,7 +416,7 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
   i = 0;
   while (i < structures->count) {
     struct struct_spec * strc = structures->array + i;
-    MDDUMP("### Structure %s\n\n```c\n", strc->name);
+    MDDUMP("### Structure %s" GOBACK_TO_TOP "\n\n```c\n", strc->name);
 
     dump_structure_signature(fd, buffer, strc, 1);
 
@@ -491,7 +500,7 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
   OPEN(fd, pathbuf, result);
 
   ulint i = 0;
-  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files%s\n\n## Defined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", tds->count);
+  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files" GOBACK_TO_HP "%s\n\n## Defined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", tds->count);
 
   char normalizebuffer[ENTITIES_NAME_LENGTH];
   while (i < tds->count) {
@@ -506,7 +515,7 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
   i = 0;
   while (i < tds->count) {
     struct typedef_spec * td = tds->array + i;
-    MDDUMP("### typedef %s\n```c\ntypedef ", td->name);
+    MDDUMP("### typedef %s\n" GOBACK_TO_TOP "\n```c\ntypedef ", td->name);
 
     dump_typedef_definition(td, fd, buffer, pathbuf, code); // Yes we recycle buffers here
 
@@ -543,7 +552,7 @@ static void generate_macros_page(gen_config_t config, struct result *result, cha
   PATHNAME(pathbuf, config, "%s-macros.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
 
-  MDDUMP("# %s macros\n\nThis file contains the macros that are written in the %s files%s\n\n## Defined in this file\n\nThe following **%zu** macros are referenced in this file\n", is_header ? "Headers" : "Source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to files index](#indexed-files)" : "", macros->count);
+  MDDUMP("# %s macros\n\nThis file contains the macros that are written in the %s files"  GOBACK_TO_HP "%s\n\n## Defined in this file\n\nThe following **%zu** macros are referenced in this file\n", is_header ? "Headers" : "Source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to files index](#indexed-files)" : "", macros->count);
 
   char linkpath[PATH_MAX];
   char displaypath[PATH_MAX];
@@ -557,7 +566,7 @@ static void generate_macros_page(gen_config_t config, struct result *result, cha
   i = 0;
   while (i < macros->count) {
     struct macro_spec * macro = macros->array + i;
-    MDDUMP("### macro %s\n```c\n#define %s", macro->name, macro->name);
+    MDDUMP("### macro %s\n" GOBACK_TO_TOP "\n```c\n#define %s", macro->name, macro->name);
 
     if (macro->is_function) {
       MDDUMP("(");
