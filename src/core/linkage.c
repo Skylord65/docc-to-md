@@ -861,4 +861,82 @@ int linkage(source_code_t code, callback_args args) {
 
   return args->results.fails <= before;
 }
+
+static void minimize(const char * input, char * output, size_t max) {
+  while (*input != 0 && max > 0) {
+    if (65 <= *input && *input <= 90) *output = *input + 32;
+    else *output = *input;
+    max--;
+  }
+}
+static int sort_function(const void * a, const void * b) {
+  char abuf[ENTITIES_NAME_LENGTH + 1];
+  char bbuf[ENTITIES_NAME_LENGTH + 1];
+  minimize(((struct function_spec *)a)->name, abuf, ENTITIES_NAME_LENGTH);
+  minimize(((struct function_spec *)b)->name, bbuf, ENTITIES_NAME_LENGTH);
+
+  return strcmp(abuf, bbuf);
+}
+static int sort_structure(const void * a, const void * b) {
+  char abuf[ENTITIES_NAME_LENGTH + 1];
+  char bbuf[ENTITIES_NAME_LENGTH + 1];
+
+  minimize(((struct struct_spec *)a)->name, abuf, ENTITIES_NAME_LENGTH);
+  minimize(((struct struct_spec *)b)->name, bbuf, ENTITIES_NAME_LENGTH);
+
+  return strcmp(abuf, bbuf);
+}
+static int sort_macro(const void * a, const void * b) {
+  char abuf[ENTITIES_NAME_LENGTH + 1];
+  char bbuf[ENTITIES_NAME_LENGTH + 1];
+
+  minimize(((struct macro_spec *)a)->name, abuf, ENTITIES_NAME_LENGTH);
+  minimize(((struct macro_spec *)b)->name, bbuf, ENTITIES_NAME_LENGTH);
+
+  return strcmp(abuf, bbuf);
+}
+static int sort_variable(const void * a, const void * b) {
+  char abuf[ENTITIES_NAME_LENGTH + 1];
+  char bbuf[ENTITIES_NAME_LENGTH + 1];
+
+  minimize(((struct variable *)a)->name, abuf, ENTITIES_NAME_LENGTH);
+  minimize(((struct variable *)b)->name, bbuf, ENTITIES_NAME_LENGTH);
+
+  return strcmp(abuf, bbuf);
+}
+static int sort_enum(const void * a, const void * b) {
+  char abuf[ENTITIES_NAME_LENGTH + 1];
+  char bbuf[ENTITIES_NAME_LENGTH + 1];
+
+  minimize(((struct enum_spec *)a)->name, abuf, ENTITIES_NAME_LENGTH);
+  minimize(((struct enum_spec *)b)->name, bbuf, ENTITIES_NAME_LENGTH);
+
+  return strcmp(abuf, bbuf);
+}
+static int sort_typedef(const void * a, const void * b) {
+  char abuf[ENTITIES_NAME_LENGTH + 1];
+  char bbuf[ENTITIES_NAME_LENGTH + 1];
+
+  minimize(((struct typedef_spec *)a)->name, abuf, ENTITIES_NAME_LENGTH);
+  minimize(((struct typedef_spec *)b)->name, bbuf, ENTITIES_NAME_LENGTH);
+
+  return strcmp(abuf, bbuf);
+}
+int prelinkage(source_code_t code, callback_args args) {
+  // Sorting
+  qsort(code->implementations.functions.array, code->implementations.functions.count, sizeof(struct function_spec), sort_function);
+  qsort(code->definitions.functions.array, code->definitions.functions.count, sizeof(struct function_spec), sort_function);
+  qsort(code->definitions.structs.array, code->definitions.structs.count, sizeof(struct struct_spec), sort_structure);
+  qsort(code->implementations.structs.array, code->implementations.structs.count, sizeof(struct struct_spec), sort_structure);
+  qsort(code->definitions.typedefs.array, code->definitions.typedefs.count, sizeof(struct typedef_spec), sort_typedef);
+  qsort(code->implementations.typedefs.array, code->implementations.typedefs.count, sizeof(struct typedef_spec), sort_typedef);
+  qsort(code->definitions.macros.array, code->definitions.macros.count, sizeof(struct macro_spec), sort_macro);
+  qsort(code->implementations.macros.array, code->implementations.macros.count, sizeof(struct macro_spec), sort_macro);
+  qsort(code->definitions.enums.array, code->definitions.enums.count, sizeof(struct enum_spec), sort_enum);
+  qsort(code->implementations.enums.array, code->implementations.enums.count, sizeof(struct enum_spec), sort_enum);
+  qsort(code->definitions.variables.array, code->definitions.variables.count, sizeof(struct variable), sort_variable);
+
+  args->results.success++;
+  return 0;
+}
 #undef GOTO_NEXTWORD

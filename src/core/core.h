@@ -134,6 +134,7 @@ extern int try_extract_typedef(char * buffer, const char * path, callback_args, 
 extern int try_extract_typedef_multiline(char * buffer, const char * path, callback_args args, struct status_s *);
 
 extern int linkage(source_code_t code, callback_args args);
+extern int prelinkage(source_code_t code, callback_args args);
 
 // Some registering functions
 void register_function(const char * path, callback_args params, struct status_s * status);

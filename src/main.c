@@ -53,7 +53,8 @@ int main(int argc, char * argv[]) {
     { "--enable-docstring", "Enable the registration of docstring for various types", Presence, 0, 0, NULL },
     { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL },
     { "--git-line", "Add the matching line like git would do in file reference", Presence, 0, 0, NULL },
-    { "--reference-files", "Add a section of referenced files in the produced documentation", Presence, 0, 0, NULL }
+    { "--reference-files", "Add a section of referenced files in the produced documentation", Presence, 0, 0, NULL },
+    { "--pre-linkage", "Enable the pre-linkage step. Enhance the produced documentation", Presence, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -79,6 +80,7 @@ int main(int argc, char * argv[]) {
   config.verbose_registration = args[7].found;
   config.gitline = args[10].found;
   config.reference_files_section = args[11].found;
+  config.prelinkage = args[12].found;
 
   struct callback_args_s callback_args = {
     .config = &config,
@@ -105,6 +107,12 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   if (args[7].found) summarise_parsing(callback_args.source_code);
+  if (config.prelinkage && prelinkage(callback_args.source_code, &callback_args) != 0) {
+    fprintf(stderr, "Failed the prelinkage phase\n");
+    cleanup(&config);
+    free_source_code(callback_args.source_code);
+    return 1;
+  }
   if (linkage(callback_args.source_code, &callback_args) != 0) {}
   summarise_linking(&callback_args);
 

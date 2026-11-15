@@ -21,6 +21,7 @@ struct gen_config {
   char * rebase_prefix;
   char gitline;
   char reference_files_section;
+  char prelinkage;
 };
 typedef struct gen_config * gen_config_t;
 
