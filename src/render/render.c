@@ -261,9 +261,10 @@ static void dump_function_type(int fd, char * buffer, struct function_spec * fnt
   ulint x = 0;
   while (x < fnt->args->count) {
     dump_argument_type(fd, buffer, &(fnt->args->array[x].type), fnt->args->array[x].name);
-    MDDUMP("%s", x + 1 < fnt->args->count ? ", " : ")");
+    MDDUMP("%s", x + 1 < fnt->args->count ? ", " : "");
     x++;
   }
+  MDDUMP(")");
 }
 static void dump_function_signature(int fd, char * buffer, struct function_spec * fnt, source_code_t code, char * locationbuffer) {
   MDDUMP("#### Return type\n\n[`");
