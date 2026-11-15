@@ -20,6 +20,7 @@ struct gen_config {
   int verbose_registration;
   char * rebase_prefix;
   char gitline;
+  char reference_files_section;
 };
 typedef struct gen_config * gen_config_t;
 

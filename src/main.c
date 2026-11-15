@@ -52,7 +52,8 @@ int main(int argc, char * argv[]) {
     { "--verbose-registration", "Enable logs in standard output for registration of elements when parsing", Presence, 0, 0, NULL },
     { "--enable-docstring", "Enable the registration of docstring for various types", Presence, 0, 0, NULL },
     { "--rebase-path", "Some text to append before the name of the paths. If not given, absolute path will remain. If given, the display name will be rebased and show from root of project, and link will be precedeed by this", String, 0, 0, NULL },
-    { "--git-line", "Add the matching line like git would do in file reference", Presence, 0, 0, NULL }
+    { "--git-line", "Add the matching line like git would do in file reference", Presence, 0, 0, NULL },
+    { "--reference-files", "Add a section of referenced files in the produced documentation", Presence, 0, 0, NULL }
   };
   int args_size = sizeof(args) / sizeof(struct arg_input);
 
@@ -77,6 +78,7 @@ int main(int argc, char * argv[]) {
   }
   config.verbose_registration = args[7].found;
   config.gitline = args[10].found;
+  config.reference_files_section = args[11].found;
 
   struct callback_args_s callback_args = {
     .config = &config,
@@ -97,7 +99,7 @@ int main(int argc, char * argv[]) {
   recursion(config.work, &callback_args, recursion_callback);
   if (args[8].found) recursion(config.src, &callback_args, register_docstring_callback);
   if (callback_args.results.fails > 0) {
-    fprintf(stderr, "Failed to parse content\n");
+    fprintf(stderr, "Failed to parse content (%zu) errors\n", callback_args.results.fails);
     cleanup(&config);
     free_source_code(callback_args.source_code);
     return 1;

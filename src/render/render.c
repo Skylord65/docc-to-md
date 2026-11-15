@@ -3,6 +3,7 @@
 #include "../core/core.h"
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -29,6 +30,84 @@
   snprintf(into + written, PATH_MAX - written - 1, "/" __VA_ARGS__);\
 }
 
+string_hash hash_string(char * input, size_t max) {
+  size_t index = 0;
+  string_hash hash = 0;
+  const string_hash prime = 929;
+  const string_hash modulus = 1e9 + 9;
+
+  while (*input != 0 && index < max) {
+    hash = (hash * prime + *input) % modulus;
+    input++;
+    index++;
+  }
+  return hash;
+}
+typedef enum {
+  MacrosIndic,
+  StructuresIndic,
+  EnumsIndic,
+  FunctionsIndic,
+  TypedefsIndic
+} IndicType;
+static void generate_path_pair(const char * filename, gen_config_t config, char * displaybuffer, char * linkbuffer) {
+  if (config->rebase_prefix == NULL) {
+    STRCP((char *)filename, displaybuffer, PATH_MAX, 1);
+    STRCP((char *)filename, linkbuffer, PATH_MAX, 1);
+  } else {
+    rebase_path(filename, config->srcdirname, "", displaybuffer, PATH_MAX);
+    rebase_path(filename, config->srcdirname, config->rebase_prefix, linkbuffer, PATH_MAX);
+  }
+}
+static void dump_references(int fd, char * buffer, void * indic, IndicType type, gen_config_t config) {
+  ulint count = type == MacrosIndic ? ((struct macro_indic *)indic)->count : type == StructuresIndic ? ((struct struct_indic *)indic)->count : type == EnumsIndic ? ((struct enum_indic *)indic)->count : type == FunctionsIndic ? ((struct function_indic *)indic)->count : type == TypedefsIndic ? ((struct typedef_indic *)indic)->count : 0;
+
+  size_t array_size = 10;
+  string_hash * array;
+  unsigned int array_index = 0;
+  if ((array = malloc(sizeof(string_hash) * array_size)) == NULL) {
+    perror("malloc file reference");
+    return;
+  }
+  ulint i = 0;
+  char displaybuffer[PATH_MAX];
+  char linkbuffer[PATH_MAX];
+  while (i < count) {
+    char * filename = type == MacrosIndic ? ((struct macro_indic *)indic)->array[i].ref->filename : type == StructuresIndic ? ((struct struct_indic *)indic)->array[i].ref->filename : type == EnumsIndic ? ((struct enum_indic *)indic)->array[i].ref->filename : type == FunctionsIndic ? ((struct function_indic *)indic)->array[i].ref->filename : type == TypedefsIndic ? ((struct typedef_indic *)indic)->array[i].ref->filename : NULL;
+
+    if (filename == NULL) {
+      i++;
+      continue;
+    }
+    string_hash hash = hash_string(filename, PATH_MAX);
+
+    int exists = 0;
+    ulint j = 0;
+    while (j < array_index && !exists) {
+      if (array[j] == hash) exists = 1; // Then we already registered it
+      j++;
+    }
+    if (exists) {
+      i++;
+      continue;
+    }
+
+    generate_path_pair(filename, config, displaybuffer, linkbuffer);
+    MDDUMP("- [`%s`](%s)\n", displaybuffer, linkbuffer);
+
+    array_size += 10;
+    if (array_index == array_size) {
+      if ((array = realloc(array, sizeof(string_hash) * array_size)) == NULL) {
+        perror("realloc");
+        return;
+      }
+    }
+    array[array_index++] = hash;
+    i++;
+  }
+
+  free(array);
+}
 
 typedef enum {
   LocationPrimitive = 0,
@@ -167,15 +246,6 @@ static void dump_argument_type(int fd, char * buffer, entity_type_t * type, char
 
   dump_complementary_types(fd, buffer, type, name);
 }
-static void generate_path_pair(const char * filename, gen_config_t config, char * displaybuffer, char * linkbuffer) {
-  if (config->rebase_prefix == NULL) {
-    STRCP((char *)filename, displaybuffer, PATH_MAX, 1);
-    STRCP((char *)filename, linkbuffer, PATH_MAX, 1);
-  } else {
-    rebase_path(filename, config->srcdirname, "", displaybuffer, PATH_MAX);
-    rebase_path(filename, config->srcdirname, config->rebase_prefix, linkbuffer, PATH_MAX);
-  }
-}
 static void dump_function_type(int fd, char * buffer, struct function_spec * fnt) {
   dump_argument_type(fd, buffer, &(fnt->returntype), NULL);
   MDDUMP(" %s(", fnt->name);
@@ -207,7 +277,7 @@ static void generate_functions_page(struct function_indic * functions, source_co
   PATHNAME(pathbuf, config, "%s-functions.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
 
-  MDDUMP("# %s functions\n\n## Defined in this file\n\nThe following **%zu** functions are referenced here\n\n", is_header ? "Header" : "Source", functions->count);
+  MDDUMP("# %s functions\nThis file contains the definitions and documentation of the functions%s\n\n## Defined in this file\n\nThe following **%zu** functions are referenced here\n\n", is_header ? "Header" : "Source", config->reference_files_section ? "\n> [Skip to files index](#indexed-files)" : "", functions->count);
 
   char normalizebuffer[ENTITIES_NAME_LENGTH];
   ulint j = 0;
@@ -236,6 +306,10 @@ static void generate_functions_page(struct function_indic * functions, source_co
     j++;
   }
 
+  if (config->reference_files_section) {
+    MDDUMP("\n\n## Indexed files\n");
+    dump_references(fd, buffer, functions, FunctionsIndic, config);
+  }
 
   close(fd);
 }
@@ -316,7 +390,7 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
   PATHNAME(pathbuf, config, "%s-structures.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
 
-  MDDUMP("# %s structures\n\nThis file contains all the declared structures for the %s\n\n## Defined in this file\n\nThe following **%zu** structures are referenced here\n\n", is_header ? "Headers" : "Source", is_header ? "headers files" : "source files", structures->count);
+  MDDUMP("# %s structures\n\nThis file contains all the declared structures for the %s%s\n\n## Defined in this file\n\nThe following **%zu** structures are referenced here\n\n", is_header ? "Headers" : "Source", is_header ? "headers files" : "source files", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", structures->count);
 
   char normalizebuffer[ENTITIES_NAME_LENGTH + 2];
   ulint i = 0;
@@ -345,6 +419,11 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
     dump_structure_members_signature(fd, buffer, strc, code, displaybuffer);
 
     i++;
+  }
+
+  if (config->reference_files_section) {
+    MDDUMP("\n\n## Indexed files\n\n");
+    dump_references(fd, buffer, structures, StructuresIndic, config);
   }
 
   close(fd);
@@ -412,7 +491,7 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
   OPEN(fd, pathbuf, result);
 
   ulint i = 0;
-  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files\n\n## Defined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", tds->count);
+  MDDUMP("# %s typedefs\n\nThis file contains the typedefs that are written in the %s files%s\n\n## Defined in this file\n\nThe following **%zu** typedefs are referenced here\n", is_header ? "Headers" : "source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to indexed files](#indexed-files)" : "", tds->count);
 
   char normalizebuffer[ENTITIES_NAME_LENGTH];
   while (i < tds->count) {
@@ -440,6 +519,11 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
     i++;
   }
 
+  if (config->reference_files_section) {
+    MDDUMP("\n\n## Indexed files\n");
+    dump_references(fd, buffer, tds, TypedefsIndic, config);
+  }
+
   close(fd);
 }
 
@@ -457,7 +541,7 @@ static void generate_macros_page(gen_config_t config, struct result *result, cha
   PATHNAME(pathbuf, config, "%s-macros.md", is_header ? "headers" : "source");
   OPEN(fd, pathbuf, result);
 
-  MDDUMP("# %s macros\n\nThis file contains the macros that are written in the %s files\n\n## Defined in this file\n\nThe following **%zu** macros are referenced in this file\n", is_header ? "Headers" : "Source", is_header ? "headers" : "source", macros->count);
+  MDDUMP("# %s macros\n\nThis file contains the macros that are written in the %s files%s\n\n## Defined in this file\n\nThe following **%zu** macros are referenced in this file\n", is_header ? "Headers" : "Source", is_header ? "headers" : "source", config->reference_files_section ? "\n> [Skip to files index](#indexed-files)" : "", macros->count);
 
   char linkpath[PATH_MAX];
   char displaypath[PATH_MAX];
@@ -489,9 +573,14 @@ static void generate_macros_page(gen_config_t config, struct result *result, cha
     else MDDUMP("\n```\nDefined in [%s:%zu](%s)\n", displaypath, macro->ref->line, linkpath);
 
     if (macro->description != NULL) MDDUMP("#### Note\n\n```\n%s```\n", macro->description);
+
     i++;
   }
 
+  if (config->reference_files_section) {
+    MDDUMP("\n\n## Indexed files\n");
+    dump_references(fd, buffer, macros, MacrosIndic, config);
+  }
   close(fd);
 }
 static void generate_homepage(MDARGS_T) {

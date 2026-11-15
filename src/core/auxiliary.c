@@ -653,6 +653,7 @@ int register_structure(const char * filename, callback_args params, struct statu
 
       if (typebuf == NULL || namebuf == NULL) {
         params->results.fails++;
+        fprintf(stderr, "    /!\\ Failed to compute struct member types and name (input was : %s)\n", srcbuf);
         free(structure->members->array);
         free(structure->members);
         free(structure->ref);
@@ -1018,6 +1019,7 @@ almost_complete_fail:
           var_name = input + j + 1;
         }
         if (input[j] == '(' || input[j] == '{') {
+          fprintf(stderr, "    /!\\ Invalid function argument definition (%s at %s:%zu)\n", input, data->filenameptr, data->starts_on_line);
           free(input);
           goto almost_complete_fail;
         }
