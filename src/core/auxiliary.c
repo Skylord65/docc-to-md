@@ -1937,6 +1937,7 @@ static int register_typedef(const char * path, callback_args args, struct status
   td->buffer = data->buffer; // Only store the found typedef, we cannot really compute it now, we need to know every other type
   td->ref->line = data->starts_on_line;
   td->modifiers = data->modifiers;
+  td->description = NULL;
   rebase_path(path, args->config->work, args->config->src, td->ref->filename, PATH_MAX);
 
   if (args->config->verbose_registration) printf("- Registering typedef %s\n", td->name);

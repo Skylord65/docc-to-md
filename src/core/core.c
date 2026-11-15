@@ -460,10 +460,12 @@ void register_docstring_callback(const char * src, callback_args params) {
         struct function_indic * indicator = is_headerfile ? &(params->source_code->definitions.functions) : &(params->source_code->implementations.functions);
         struct macro_indic * macro_indicator = is_headerfile ? &(params->source_code->definitions.macros) : &(params->source_code->implementations.macros);
         struct struct_indic * structures_indic = is_headerfile ? &(params->source_code->definitions.structs) : &(params->source_code->implementations.structs);
+        struct typedef_indic * typedefs_indic = is_headerfile ? &(params->source_code->definitions.typedefs) : &(params->source_code->implementations.typedefs);
 
         struct function_spec * function = NULL;
         struct macro_spec * macro = NULL;
-        struct struct_spec * strc;
+        struct struct_spec * strc = NULL;
+        struct typedef_spec * td = NULL;
         ulint i = 0;
         while (i < indicator->count) {
           if ((indicator->array[i].ref->line == linecount || indicator->array[i].ref->line == linecount + 1) && streq(indicator->array[i].ref->filename, (char *)src)) {// We do have a function (on this line or on another one), mark it, and proceed
@@ -491,7 +493,16 @@ void register_docstring_callback(const char * src, callback_args params) {
               }
               i++;
             }
-            if (strc == NULL) continue;
+            if (strc == NULL) { // Look for typedefs instead
+              i = 0;
+              while (i < typedefs_indic->count) {
+                if ((typedefs_indic->array[i].ref->line == linecount || typedefs_indic->array[i].ref->line == linecount + 1) && streq(typedefs_indic->array[i].ref->filename, (char *)src)) {
+                  td = typedefs_indic->array + i;
+                  break;
+                }
+                i++;
+              }
+            }
           }
         }
         long jump_back = ftell(stream);
@@ -551,15 +562,21 @@ void register_docstring_callback(const char * src, callback_args params) {
           if (description[description_index] != ' ' && description[description_index] != '\n') healthy = 1;
           description_index++;
         }
-        if (!healthy) free(description);
+        if (!healthy) {
+          free(description);
+          linecount++;
+          continue;
+        }
 
         if (function != NULL) function->description = description;
         else if (macro != NULL) macro->description = description;
         else if (strc != NULL) strc->description = description;
+        else if (td != NULL) td->description = description;
+        else free(description);
 
         if (params->config->verbose_registration) printf("- Registering comment doc for %s %s\n",
-            function != NULL ? "function" : macro != NULL ? "macro" : strc != NULL ? "structure" : "N/A",
-            function != NULL ? function->name : macro != NULL ? macro->name : strc != NULL ? strc->name : "N/A");
+            function != NULL ? "function" : macro != NULL ? "macro" : strc != NULL ? "structure" : td != NULL ? "typedef" : "N/A",
+            function != NULL ? function->name : macro != NULL ? macro->name : strc != NULL ? strc->name : td != NULL ? td->name : "N/A");
         linecount++; // Just to make things clear : I have absolutely no idea why I need to increment this but I know I need to. That's how it is.
         continue;
       }

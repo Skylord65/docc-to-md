@@ -514,6 +514,8 @@ static void generate_typedefs_page(MDARGS_T, struct typedef_indic *tds, int is_h
     if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n%s", displaypath, td->ref->line, linkpath, td->ref->line, pathbuf)
     else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n%s", displaypath, td->ref->line, linkpath, pathbuf);
 
+    if (td->description != NULL) MDDUMP("#### Note\n\n```\n%s```\n", td->description);
+
     if (td->definition.type == TypedefinedFunction || td->definition.type == FunctionType) dump_function_signature(fd, buffer, td->definition.ptr, code, displaypath);
     else if (td->definition.type == TypedefinedStructure) dump_structure_members_signature(fd, buffer, td->definition.ptr, code, displaypath);
     i++;
