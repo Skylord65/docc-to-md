@@ -14,7 +14,7 @@ options=("!debug")
 sha256sums=("SKIP")
 
 pkgver() {
-  echo "$( $srcdir/$_name/src/macros.h" | grep -E '^#define PROG_VERSION' | awk -F' ' '{print \$3' | tr -d '\"' )"
+  echo "$( $srcdir/$_name/src/macros.h" | grep -E '^#define PROG_VERSION' | awk -F' ' '{print \$3' | tr -d '\"' }"
 }
 build() {
   cd "$srcdir/$_name"
