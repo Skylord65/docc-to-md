@@ -1,0 +1,19 @@
+Source: docc-to-md
+Section: devel
+Priority: optional
+Maintainer: Greensky <david.hesliere@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ git,
+ gcc,
+ make
+Standards-Version: 4.7.0
+Homepage: https://git.greensky.tf/Greensky/docc-to-md
+Rules-Requires-Root: no
+License: GPL-3.0-or-later
+
+Package: docc-to-md
+Architecture: any
+Depends: ${misc:Depends}
+Description: Generate markdown documentation for C source code
+ docc-to-md generates Markdown documentation from C source code.
