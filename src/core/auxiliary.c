@@ -327,6 +327,7 @@ static int register_macro(const char * path, callback_args params, struct status
   STRCP(data->name, macro->name, ENTITIES_NAME_LENGTH, 1);
   STRCP(data->content, macro->placeholder, data->content_index, 1);
   macro->ref->line = data->starts_on_line;
+  macro->description = NULL;
   rebase_path(path, params->config->work, params->config->src, macro->ref->filename, PATH_MAX);
 
   if (params->config->verbose_registration) printf("- Registering macro %s (%zu arguments)\n", macro->name, macro->is_function ? macro->args->count : 0);

@@ -458,7 +458,10 @@ void register_docstring_callback(const char * src, callback_args params) {
         in_multiline_comment = 0;
         // Now look if there is any function that is registered here or 
         struct function_indic * indicator = is_headerfile ? &(params->source_code->definitions.functions) : &(params->source_code->implementations.functions);
+        struct macro_indic * macro_indicator = is_headerfile ? &(params->source_code->definitions.macros) : &(params->source_code->implementations.macros);
+
         struct function_spec * function = NULL;
+        struct macro_spec * macro = NULL;
         ulint i = 0;
         while (i < indicator->count) {
           if ((indicator->array[i].ref->line == linecount || indicator->array[i].ref->line == linecount + 1) && streq(indicator->array[i].ref->filename, (char *)src)) {// We do have a function (on this line or on another one), mark it, and proceed
@@ -468,14 +471,25 @@ void register_docstring_callback(const char * src, callback_args params) {
           i++;
         }
 
-        if (function == NULL) continue;
+        if (function == NULL) { // Look for macros instead
+          i = 0;
+          while (i < macro_indicator->count) {
+            if ((macro_indicator->array[i].ref->line == linecount || macro_indicator->array[i].ref->line == linecount + 1) && streq(macro_indicator->array[i].ref->filename, (char *)src)) {
+              macro = macro_indicator->array + i;
+              break;
+            }
+            i++;
+          }
+          if (macro == NULL) continue;
+        }
         long jump_back = ftell(stream);
 
         fseek(stream, multiline_start, SEEK_SET);
         unsigned long int description_index = 0;
         size_t description_size = 1024;
 
-        if ((function->description = malloc(description_size)) == NULL) {
+        char * description;
+        if ((description = malloc(description_size)) == NULL) {
           perror("malloc function->description");
           params->results.fails++;
           fclose(stream);
@@ -488,22 +502,22 @@ void register_docstring_callback(const char * src, callback_args params) {
           int started = 0;
           while (*bufptr != 0) {
             if (description_index == description_size - 1) {
-              if ((function->description = realloc(function->description, description_size * 2)) == NULL) {
+              if ((description = realloc(description, description_size * 2)) == NULL) {
                 perror("realloc function->description");
                 params->results.fails++;
-                free(function->description);
+                free(description);
                 return;
               }
             }
             if (!started) {
               if (*bufptr != ' ' && *bufptr != '*' && *bufptr != '/') {
                 started = 1;
-                function->description[description_index] = *bufptr;
+                description[description_index] = *bufptr;
                 description_index++;
               }
             } else {
               if (*(bufptr - 1) != '*' || *bufptr != '/') {
-                function->description[description_index] = *bufptr;
+                description[description_index] = *bufptr;
                 description_index++;
               }
             }
@@ -513,23 +527,24 @@ void register_docstring_callback(const char * src, callback_args params) {
         }
         if (errno != 0) {
           perror("fgets description");
-          free(function->description);
+          free(description);
         }
-        if (description_index > 0 && function->description[description_index - 1] == '\n') function->description[description_index] = 0;
-        else function->description[description_index] = 0;
+        if (description_index > 0 && description[description_index - 1] == '\n') description[description_index] = 0;
+        else description[description_index] = 0;
 
         // Health check on the description : if we have only spaces and newlines, we can remove it
         description_index = 0;
         int healthy = 0;
-        while (function->description[description_index] != 0 && !healthy) {
-          if (function->description[description_index] != ' ' && function->description[description_index] != '\n') healthy = 1;
+        while (description[description_index] != 0 && !healthy) {
+          if (description[description_index] != ' ' && description[description_index] != '\n') healthy = 1;
           description_index++;
         }
-        if (!healthy) {
-          free(function->description);
-          function->description = NULL;
-        }
-        if (params->config->verbose_registration) printf("- Registering comment doc for function %s\n", function->name);
+        if (!healthy) free(description);
+
+        if (function != NULL) function->description = description;
+        else if (macro != NULL) macro->description = description;
+
+        if (params->config->verbose_registration) printf("- Registering comment doc for %s %s\n", function == NULL ? "function" : macro != NULL ? "macro" : "N/A", function != NULL ? function->name : macro != NULL ? macro->name : "N/A");
         linecount++; // Just to make things clear : I have absolutely no idea why I need to increment this but I know I need to. That's how it is.
         continue;
       }

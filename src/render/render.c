@@ -486,6 +486,8 @@ static void generate_macros_page(gen_config_t config, struct result *result, cha
     generate_path_pair(macro->ref->filename, config, displaypath, linkpath);
     if (config->gitline) MDDUMP("\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaypath, macro->ref->line, linkpath, macro->ref->line)
     else MDDUMP("\n```\nDefined in [%s:%zu](%s)\n", displaypath, macro->ref->line, linkpath);
+
+    if (macro->description != NULL) MDDUMP("#### Note\n\n```\n%s```\n", macro->description);
     i++;
   }
 

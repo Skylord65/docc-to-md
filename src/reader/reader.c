@@ -26,6 +26,7 @@ static void free_macro(struct macro_spec * macro) {
       free(macro->args);
     }
   }
+  if (macro->description != NULL) free(macro->description);
 
   free(macro->ref);
 }

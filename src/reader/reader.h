@@ -121,6 +121,7 @@ struct macro_spec {
   char name[ENTITIES_NAME_LENGTH];
   char placeholder[MACRO_PLACEHOLDER_LENGTH];
   int is_function;
+  char * description;
   struct macro_args * args;
   reference_t ref;
 };
