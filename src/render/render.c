@@ -341,6 +341,7 @@ static void generate_structures_page(MDARGS_T, struct struct_indic * structures,
     if (config->gitline) MDDUMP(";\n```\nDefined in [%s:%zu](%s#L%zu)\n", displaybuffer, strc->ref->line, linkbuffer, strc->ref->line)
     else MDDUMP(";\n```\nDefined in [%s:%zu](%s)\n", displaybuffer, strc->ref->line, linkbuffer);
 
+    if (strc->description != NULL) MDDUMP("#### Note\n\n```\n%s```\n", strc->description);
     dump_structure_members_signature(fd, buffer, strc, code, displaybuffer);
 
     i++;

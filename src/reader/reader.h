@@ -70,6 +70,7 @@ struct struct_members {
   struct struct_member * array;
 };
 struct struct_spec {
+  char * description;
   reference_t ref;
   char name[ENTITIES_NAME_LENGTH];
   struct struct_members * members;

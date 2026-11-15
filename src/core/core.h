@@ -69,6 +69,9 @@ struct macro_multiline_status_s {
   int in_char;
   ulint starts_on_line;
 };
+/**
+ * `char ** member_array` is an array of strings. Temporarily store them as such and compute the types later in `register_structure` call
+ */
 struct struct_multiline_status_s {
   char name[ENTITIES_NAME_LENGTH];
   ulint starts_on_line;

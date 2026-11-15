@@ -678,6 +678,7 @@ int register_structure(const char * filename, callback_args params, struct statu
   rebase_path(filename, params->config->work, params->config->src, structure->ref->filename, PATH_MAX);
   structure->members->count = data->members_count;
   structure->ref->line = data->starts_on_line;
+  structure->description = NULL;
 
   if (data->doubleptr == NULL) {
     if (status->is_header) params->source_code->definitions.structs.count++;

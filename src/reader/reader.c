@@ -51,6 +51,7 @@ static void free_structure(struct struct_spec * structure) {
     free(structure->members->array);
   }
   free(structure->members);
+  if (structure->description != NULL) free(structure->description);
   if (structure->ref != NULL) free(structure->ref);
 }
 static void free_structures_array(struct struct_indic * structures) {
