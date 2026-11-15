@@ -35,7 +35,7 @@ jobs:
           WIKI_DIR="$( realpath ~/documentation )"
           echo "wiki_dir=$WIKI_DIR" >> "$GITHUB_OUTPUT"
 
-          /usr/bin/docc-to-md --src src --dest "$WIKI_DIR" --verbose-registration --enable-docstring --reference-files --git-line --rebase-path $URL/src/branch/main/
+          /usr/bin/docc-to-md --src src --dest "$WIKI_DIR" --verbose-registration --enable-docstring --reference-files --git-line --pre-linkage --rebase-path $URL/src/branch/main/
 
       - name: Push documentation to wiki
         id: pushwiki
@@ -109,8 +109,7 @@ jobs:
           color: '3447003'
           title: 'Documentation generated'
           title_url: '${{ github.server_url }}/${{ github.repository }}'
-          description_file: discord-description.md
-          attachment_file: documentation.tar.gz
-          attachment_name: documentation.tar.gz
+          description: |
+            The [`Wiki`](${{ github.server_url }}/${{ github.repository }}/wiki) has been updated
           footer_text: 'Forgejo Actions'
           footer_icon_url: 'https://git.greensky.tf/Greensky/assets/raw/commit/1745b18f7115e22905923ac5937ccd2d1ab00be0/logos/forgejo/logo.png'
