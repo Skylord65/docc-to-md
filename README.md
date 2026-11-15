@@ -121,7 +121,9 @@ makepkg -siCcf
 
 ### From repository
 
-When it will be finished, it will be released, it will be available on my [forgejo packages repository page](https://git.greensky.tf/Greensky/-/packages), auto compiled and published by the [PKGBUILDING](https://git.greensky.tf/Greensky/PKGBUILDING) repository
+The [PKGBUILDING](https://git.greensky.tf/Greensky/PKGBUILDING) repository continuously compiles a version of this file and publishes it
+
+> [See more detailled instructions](https://git.greensky.tf/Greensky/-/packages/docc-to-md)
 
 ## Roadmap
 
