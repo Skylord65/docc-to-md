@@ -1,5 +1,4 @@
 #include "rendering.h"
-#include "../debug.h"
 #include "../macros.h"
 #include "../core/core.h"
 #include <fcntl.h>

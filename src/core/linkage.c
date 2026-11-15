@@ -1,5 +1,4 @@
 #include "core.h"
-#include "../debug.h"
 #include "../reader/reader.h"
 #include "../macros.h"
 #include "../parsers/stringlib.h"
@@ -525,7 +524,6 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
   if (!td->is_function && try_parse_primitive(bufptr, &data, &input_rest) == 0) {
     if (last_space != NULL) *last_space = ' ';
     if (compute_rest_of_type(input_rest, &(td->definition)) != 0) {
-      DEBUG("Failed to compute rest of type for " DBG_REDT("%s"), input_rest);
       return 1;
     }
 
@@ -533,13 +531,11 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
     ulint i = 0;
     while (i < code->primitives.count) {
       struct primitive_spec * spec = code->primitives.array + i;
-      DEBUG("Looking for " DBG_REDT("%s") " (td : " DBG_LIGHT_REDT("%s") " ) -- against " DBG_YELLOWT("%s"), spec->name, td->name, data.buffer);
       if (
           spec->source == data.source &&
           spec->is_structure == data.is_structure && // That sould be set to 0 though
           streq(data.buffer, spec->name)
          ) { // Then they are the same
-        DEBUG("Matching " DBG_PURPLET("%s") " with " DBG_REDT("%s"), spec->name, data.buffer);
         td->definition.ptr = spec;
         td->definition.type = PrimitiveType;
         return 0;
@@ -796,18 +792,24 @@ static int prepare_typedefs(struct typedef_indic * tds, source_code_t code) {
   char * input_rest = NULL;
   ulint i = 0;
   while (i < tds->count) {
+    init_primitive_data(&data);
     struct typedef_spec * td = tds->array + i;
     char * input = td->buffer;
     GOTO_NEXTWORD(input);
     char * last_space = NULL;
     char * ptr = input;
+    char * star = NULL;
     while (*ptr != 0) {
       if (*ptr == ' ') last_space = ptr;
+      else if (*ptr == '*' && star == NULL) star = ptr - 1;
       ptr++;
     }
     if (last_space != NULL) *last_space = 0;
+    if (star != NULL) *star = 0;
 
     if (!td->is_function && try_parse_primitive(input, &data, &input_rest) == 0) {
+      if (last_space != NULL) *last_space = ' ';
+      if (star != NULL) *star = ' '; // Yes I know it is counter intuitive
       // Find the already registered primitive if it exists
       ulint j = 0;
       while (j < code->primitives.count) {
@@ -818,15 +820,16 @@ static int prepare_typedefs(struct typedef_indic * tds, source_code_t code) {
             streq(data.buffer, spec->name)
         ) { // Then they are the same
           if (last_space != NULL) *last_space = ' ';
-          return 0;
+          break;
         }
         j++;
       }
 
-      if (register_primitive(code, &data) != 0) return 1;
+      if (j == code->primitives.count && register_primitive(code, &data) != 0) return 1;
       // The added primitive is automatically the last
     }
     if (last_space != NULL) *last_space = ' ';
+    if (star != NULL) *star = ' ';
     i++;
   }
   return 0;
