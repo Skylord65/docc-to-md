@@ -151,7 +151,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: windows_x86-64_${{needs.preparation.outputs.version}}
+          name: windows_x86-64_${{needs.preparation.outputs.version}}.exe
           path: .\bin\main.uwu.exe
           if-no-files-found: error
           retention-days: 1
