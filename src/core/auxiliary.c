@@ -147,7 +147,7 @@ static char * normalize_variable_input(const char * input, size_t size, int * va
         if (output[output_index - 1] == ' ' && output[output_index - 2] == '*') output[output_index - 1] = '*';
         else output[output_index++] = '*';
       }
-    } else if (*input == ' ') {
+    } else if (*input == ' ' || *input == '\t') {
       if (output_index > 0 && output[output_index - 1] != ' ') output[output_index++] = ' ';
     } else if (*input == '[') {
       if (output[output_index - 1] != ' ') output[output_index++] = ' ';
@@ -1024,7 +1024,7 @@ almost_complete_fail:
           }
           var_name = input + j + 1;
         }
-        if (input[j] == '(' || input[j] == '{') {
+        if (input[j] == '{') {
           fprintf(stderr, "    /!\\ Invalid function argument definition (%s at %s:%zu)\n", input, data->filenameptr, data->starts_on_line);
           free(input);
           goto almost_complete_fail;
