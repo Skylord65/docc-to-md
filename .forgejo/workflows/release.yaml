@@ -76,11 +76,12 @@ jobs:
           NAME="bin/archlinux_x86-64_docc-to-md-$VERSION.uwu"
           mv bin/main.uwu "$NAME"
           echo "path=$( realpath "$NAME" )" >> "$GITHUB_OUTPUT"
+          echo "name=$( basename "$NAME" )" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: arch-package
+          name: ${{ steps.compile.outputs.name }}
           path: ${{ steps.compile.outputs.path }}
           if-no-files-found: error
           retention-days: 1
@@ -105,11 +106,12 @@ jobs:
           NAME="bin/debian_x86-64_docc-to-md-$VERSION.uwu"
           mv bin/main.uwu "$NAME"
           echo "path=$( realpath "$NAME" )" >> "$GITHUB_OUTPUT"
+          echo "name=$( basename "$NAME" )" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: debian-package
+          name: ${{ steps.compile.outputs.name }}
           path: ${{ steps.compile.outputs.path }}
           if-no-files-found: error
           retention-days: 1
