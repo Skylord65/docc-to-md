@@ -6,6 +6,7 @@ on:
       - "main"
       - "workflow"
     paths-ignore:
+      - '.forgejo/**'
       - 'README.md'
       - 'LICENSE'
       - '.gitignore'
