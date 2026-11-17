@@ -119,6 +119,7 @@ static struct struct_spec * try_parse_structure(char * input, source_code_t code
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input);
   if (starts_with(input, "extern") || starts_with(input, "const")) GOTO_NEXTWORD(input); // Twice because we would have extern const
 
+  while (*input == ' ' || *input == '\t') input++;
   if (!starts_with(input, "struct")) return NULL;
   GOTO_NEXTWORD(input);
 
