@@ -86,7 +86,7 @@ jobs:
           retention-days: 1
 
   debian-compile:
-    runs-on: debian
+    runs-on: debian-builder
     needs:
       - preparation
     steps:
