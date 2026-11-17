@@ -55,7 +55,7 @@ jobs:
 
           echo "notesmd=$NOTES_MD" >> "$GITHUB_OUTPUT"
           echo "webhookmd=$WEBHOOK_MD" >> "$GITHUB_OUTPUT"
-          echo "archiveslist=$ARCHIVES_LIST" "$GITHUB_OUTPUT"
+          echo "archiveslist=$ARCHIVES_LIST" >> "$GITHUB_OUTPUT"
 
   arch-compile:
     runs-on: arch
@@ -170,8 +170,6 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          pattern: "*"
-          merge-multiple: true
           path: release/
 
       - name: Check artifacts
@@ -219,48 +217,93 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Create the release
           node -e '
             const fs = require("fs");
-            fs.writeFileSync("release.json", JSON.stringify({
-              tag_name: process.env.VERSION,
-              target_commitish: process.env.GITHUB_SHA,
-              name: process.env.VERSION,
-              body: fs.readFileSync(process.env.NOTES_MD, "utf8"),
-              draft: false,
-              prerelease: false,
-            }));
+
+            fs.writeFileSync(
+              "release.json",
+              JSON.stringify({
+                tag_name: process.env.VERSION,
+                target_commitish: process.env.GITHUB_SHA,
+                name: process.env.VERSION,
+                body: fs.readFileSync(process.env.NOTES_MD, "utf8"),
+                draft: false,
+                prerelease: false,
+              })
+            );
           '
 
           curl --fail-with-body -sS -X POST \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
             --data @release.json \
-            "$API/releases" -o created.json
+            "$API/releases" \
+            -o created.json
 
           RELEASE_ID="$(node -e '
             const release = require("./created.json");
             console.log(release.id);
           ')"
 
-          echo "Release $VERSION créée (id: $RELEASE_ID)"
+          echo "Release $VERSION created (id: $RELEASE_ID)"
 
-          shopt -s nullglob
-          for file in release/*; do
+          # Collect every regular, non-empty file downloaded from artifacts.
+          # This avoids iterating over the per-artifact directories created by
+          # actions/download-artifact@v3.
+          mapfile -d '' FILES < <(
+            find release -type f -size +0c -print0
+          )
+
+          if (( ${#FILES[@]} == 0 )); then
+            echo "No non-empty release files were found in release/" >&2
+            find release -maxdepth 3 -printf '%y %s %p\n' >&2
+            exit 1
+          fi
+
+          echo "Found ${#FILES[@]} release file(s):"
+          for file in "${FILES[@]}"; do
+            printf '  %s bytes: %s\n' "$(stat -c%s "$file")" "$file"
+          done
+
+          # Upload each file as a Forgejo release attachment.
+          for file in "${FILES[@]}"; do
             filename="$(basename "$file")"
+
             encoded_name="$(node -e '
               console.log(encodeURIComponent(process.argv[1]));
             ' "$filename")"
 
-            echo "Attachement de $filename…"
+            response="asset-${filename}.json"
+
+            echo "Attaching $filename…"
 
             curl --fail-with-body -sS -X POST \
               -H "Authorization: token $TOKEN" \
-              -F "attachment=@$file" \
+              -F "attachment=@${file};filename=${filename}" \
               "$API/releases/$RELEASE_ID/assets?name=$encoded_name" \
-              -o "asset-$filename.json"
+              -o "$response"
 
-            echo "$filename attaché"
+            # Fail immediately if Forgejo recorded an empty attachment.
+            node -e '
+              const fs = require("fs");
+              const asset = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+
+              if (!asset || typeof asset.size !== "number") {
+                console.error("Invalid attachment API response:", process.argv[1]);
+                process.exit(1);
+              }
+
+              if (asset.size === 0) {
+                console.error(`Attachment ${asset.name} was uploaded with 0 bytes`);
+                process.exit(1);
+              }
+
+              console.log(`Attached ${asset.name} (${asset.size} bytes)`);
+            ' "$response"
           done
+
+          echo "All release assets were attached successfully."
 
       - name: Send discord webhook
         uses: ./.forgejo/actions/discord-notify
