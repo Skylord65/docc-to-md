@@ -21,6 +21,9 @@ jobs:
       webhookmd: ${{ steps.prepare.outputs.webhookmd }}
       archiveslist: ${{ steps.prepare.outputs.archiveslist }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Calculer la prochaine version
         id: version
         env:
@@ -28,21 +31,9 @@ jobs:
           API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
         run: |
           set -euo pipefail
-          curl --fail-with-body -sS -H "Authorization: token $TOKEN" \
-            "$API/releases?limit=50" -o releases.json
-          VERSION="$(node -e '
-            const releases = JSON.parse(require("fs").readFileSync("releases.json", "utf8"));
-            const re = /^v(\d+)\.(\d+)\.(\d+)$/;
-            const semver = releases
-              .filter(r => re.test(r.tag_name))
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            if (semver.length === 0) {
-              console.log("v0.0.1");
-            } else {
-              const [, major, minor, patch] = semver[0].tag_name.match(re);
-              console.log("v" + major + "." + minor + "." + (Number(patch) + 1));
-            }
-          ')"
+
+          VERSION="$( cat src/macros.h | grep -E '^#define PROG_VERSION=' | awk -F ' ' '{print $3}' | tr -d '"' )"
+
           echo "Version : $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
