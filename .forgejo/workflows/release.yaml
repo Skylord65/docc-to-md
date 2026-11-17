@@ -4,6 +4,7 @@ on:
   push:
     branches: 
       - "main"
+      - "workflow"
     path_ignore:
       - '.forgejo/**'
       - 'README.md'
