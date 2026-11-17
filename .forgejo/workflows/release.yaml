@@ -5,8 +5,7 @@ on:
     branches: 
       - "main"
       - "workflow"
-    path_ignore:
-      - '.forgejo/**'
+    paths-ignore:
       - 'README.md'
       - 'LICENSE'
       - '.gitignore'
