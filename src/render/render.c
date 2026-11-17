@@ -193,6 +193,7 @@ static void get_type_location(entity_type_t type, source_code_t code, char * wri
         name = ((struct macro_spec *)type.ptr)->name;
         designation = "macro";
         break;
+      default:
       case NoneType:
         // That shouldn't happen neither
         name = "N/A";
