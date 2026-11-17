@@ -78,9 +78,9 @@ int main(int argc, char * argv[]) {
     return 1;
   }
   config.verbose_registration = args[7].found;
-  config.gitline = args[10].found;
-  config.reference_files_section = args[11].found;
-  config.prelinkage = args[12].found;
+  config.gitline = (char)args[10].found;
+  config.reference_files_section = (char)args[11].found;
+  config.prelinkage = (char)args[12].found;
 
   struct callback_args_s callback_args = {
     .config = &config,

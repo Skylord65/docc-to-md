@@ -345,7 +345,7 @@ static int assign_type(source_code_t code, char * input, entity_type_t * type) {
 
   init_primitive_data(&data);
 
-  if (type != NULL) type->is_constant = starts_with(input, "const ");
+  if (type != NULL) type->is_constant = (char)starts_with(input, "const ");
 
   char * input_rest = NULL;
   void * res;
@@ -618,7 +618,7 @@ static int link_typedef(struct typedef_spec * td, source_code_t code, callback_a
     }
   }
   if (word_eq(ptr, "struct")) {
-    char * ptrcp = ptr;
+    ptrcp = ptr;
     GOTO_NEXTWORD(ptrcp);
     if (*ptrcp == '{') {
       struct status_s status = {

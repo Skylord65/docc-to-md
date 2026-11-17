@@ -43,7 +43,7 @@ string_hash hash_string(char * input, size_t max) {
   size_t index = 0;
   string_hash hash = 0;
   const string_hash prime = 929;
-  const string_hash modulus = 1e9 + 9;
+  const string_hash modulus =(string_hash)(1e9 + 9);
 
   while (*input != 0 && index < max) {
     hash = (hash * prime + *input) % modulus;
