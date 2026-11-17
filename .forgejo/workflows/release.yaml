@@ -98,7 +98,7 @@ jobs:
       - name: Compile
         id: compile
         env:
-          VERSION: ${{ needs.preparation.version.version }}
+          VERSION: ${{ needs.preparation.outputs.version }}
         run: |
           set -euo pipefail
 
