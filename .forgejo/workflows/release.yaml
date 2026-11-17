@@ -191,7 +191,7 @@ jobs:
           WEBHOOK_MD: ${{ needs.preparation.outputs.webhookmd }}
         run: |
           set -euo pipefail
-          REPO="${GITHUB_REPOSITORY*/}"
+          REPO="${REPO_NAME}"
           NAME="${REPO}-${VERSION}"
           STAMP="$(date +'%d/%m/%Y à %H:%M:%S %Z')"
 
