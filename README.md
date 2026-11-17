@@ -142,7 +142,7 @@ This is essentially a list of things to do, so I don't forget
 | Markdown writing | Necessary | Needs types resolved | ✅ |
 | Pre Linkage | Optional | Add a prelinkage phase to do things like sorting types | ✅ |
 | Type modifiers | Important | Introduce type modifiers (like constant, volatile...) | ✅ |
-| Windows Portability | Low | Check installation steps on [Windows intall](#installation) | ✅ |
+| Windows Portability | Low | Check installation steps on [Windows install](#installation) | ✅ |
 
 > Legend :<br>
 > 🚧 : Planned<br>
