@@ -67,7 +67,7 @@ jobs:
       - name: Compile
         id: compile
         env:
-          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION: ${{ needs.preparation.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -96,7 +96,7 @@ jobs:
       - name: Compile
         id: compile
         env:
-          VERSION: ${{ needs.prepare.version.version }}
+          VERSION: ${{ needs.preparation.version.version }}
         run: |
           set -euo pipefail
 
@@ -139,11 +139,13 @@ jobs:
         id: build
         env:
           TZ: Europe/Paris
-          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION: ${{ needs.preparation.outputs.version }}
           TREE: ${{ github.server_url }}/${{ github.repository }}/src/branch/main
           RELEASES: ${{ github.server_url }}/${{ github.repository }}/releases
           REPO_NAME: ${{ github.repository }}
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          NOTES_MD: ${{ needs.preparation.outputs.notesmd }}
+          WEBHOOK_MD: ${{ needs.preparation.outputs.webhookmd }}
         run: |
           set -euo pipefail
           REPO="${GITHUB_REPOSITORY##*/}"
@@ -168,8 +170,8 @@ jobs:
         env:
           TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          NOTES_MD: ${{ needs.prepare.outputs.notesmd }}
+          VERSION: ${{ needs.preparation.outputs.version }}
+          NOTES_MD: ${{ needs.preparation.outputs.notesmd }}
         run: |
           set -euo pipefail
 
@@ -224,6 +226,6 @@ jobs:
           bot_name: ${{ github.repository }}
           title: 'Release published'
           title_url: ${{ github.server_url }}/${{ github.repository }}
-          description_file: ${{ needs.prepare.outputs.webhookmd }}
+          description_file: ${{ needs.preparation.outputs.webhookmd }}
           footer_text: 'Forgejo Actions'
           footer_icon_url: 'https://git.greensky.tf/Greensky/assets/raw/commit/1745b18f7115e22905923ac5937ccd2d1ab00be0/logos/forgejo/logo.png'
