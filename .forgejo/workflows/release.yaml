@@ -196,8 +196,9 @@ jobs:
           STAMP="$(date +'%d/%m/%Y à %H:%M:%S %Z')"
 
           {
+            printf '# Docc-to-md %s\n\n' "$VERSION"
             echo " Version $VERSION"
-            printf '\n\nThis is the **version %s** of the project' "$VERSION"
+            printf '\n\nThis is the **version %s** of the project\n\n## Installation\n\nDownload any of the attached files if they match your installation\n' "$VERSION"
           } >> "$NOTES_MD"
 
           printf 'La version [**%s**](%s/tag/%s) de [**%s**](%s) a été publiée\n\n' "$VERSION" "$RELEASES" "$VERSION" "$REPO_NAME" "$REPO_URL" >> "$WEBHOOK_MD"
