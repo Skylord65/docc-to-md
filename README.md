@@ -82,6 +82,10 @@ See the [wiki page of this repository](https://git.greensky.tf/Greensky/docc-to-
 
 ## Installation
 
+### From binary
+
+See the [release section](https://git.greensky.tf/Greensky/docc-to-md) to install pre-compiled binaries
+
 ### From source
 
 ```bash
